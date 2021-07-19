@@ -27,6 +27,7 @@ LineSearches = "7"
 OMEinsum = "0.4"
 FileIO = "1"
 ChainRulesCore = "0.10"
+Plots = "1"
 julia = "1.6"
 
 [extras]
