@@ -30,7 +30,7 @@ function magnetisation(env, model::MT) where {MT <: HamiltonianModel}
     Mag = _arraytype(M)(mag_tensor(model, β))
     mag = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,Mag,FR,Ad)[]
     λ = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,Ad)[]
-    return abs(mag/λ)
+    return mag/λ
 end
 
 """
