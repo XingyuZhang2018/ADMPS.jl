@@ -65,7 +65,7 @@ end
         F = ein"ab,ab -> "(D,D)
         return Array(E)[]/Array(F)[]
     end 
-    Zygote.gradient(foo, 1)[1]
+    @test Zygote.gradient(foo, 1)[1] ≈ num_grad(foo, 1) atol = 1e-8
 end
 
 @testset "leftenv and rightenv with $atype{$dtype}" for atype in [Array], dtype in [Float64]
@@ -77,7 +77,7 @@ end
 
     S = atype(rand(D,d,D,D,d,D))
     function foo1(β)
-        M = atype(model_tensor(Ising(),β))
+        M = atype(model_tensor(Ising(β)))
         Au *= β 
         Ad *= β
         _,FL = leftenv(Au, Ad, M)
@@ -88,7 +88,7 @@ end
     @test Zygote.gradient(foo1, 1)[1] ≈ num_grad(foo1, 1) atol = 1e-8
 
     function foo2(β)
-        M = atype(model_tensor(Ising(),β))
+        M = atype(model_tensor(Ising(β)))
         Au *= β 
         Ad *= β
         _,FR = rightenv(Au, Ad, M)

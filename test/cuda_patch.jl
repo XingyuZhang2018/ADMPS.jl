@@ -18,8 +18,8 @@ end
 
 @testset "KrylovKit with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64]
     Random.seed!(100)
-    d = 16
-    D = 30
+    d = 4
+    D = 10
     FL = atype(rand(dtype, D, d, D))
     M = atype(rand(dtype, d, d, d, d))
     AL = atype(rand(dtype, D, d, D))

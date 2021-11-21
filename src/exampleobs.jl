@@ -25,9 +25,8 @@ end
 return the up and down magnetisation of the `model`. Requires that `mag_tensor` are defined for `model`.
 """
 function magnetisation(env, model::MT) where {MT <: HamiltonianModel}
-    β = model.β
     M, Au, Ad, FL, FR, _, _ = env
-    Mag = _arraytype(M)(mag_tensor(model, β))
+    Mag = _arraytype(M)(mag_tensor(model))
     mag = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,Mag,FR,Ad)[]
     λ = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,Ad)[]
     return mag/λ
@@ -41,9 +40,8 @@ temperature `β` and the environment bonddimension `D` as calculated with
 vumps. Requires that `model_tensor` are defined for `model`.
 """
 function energy(env,model::MT) where {MT <: HamiltonianModel}
-    β = model.β
     M, Au, Ad, FL, FR, _, _ = env
-    Ene = _arraytype(M)(energy_tensor(model, β))
+    Ene = _arraytype(M)(energy_tensor(model))
     energy = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,Ene,FR,Ad)[]
     λ = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,Ad)[]
     return energy/λ*2 # factor 2 for counting horizontal and vertical links
@@ -66,7 +64,7 @@ end
 return the analytical result for the magnetisation at inverse temperature
 `β` for the 2d classical ising model.
 """
-magofβ(::Ising, β) = β > isingβc ? (1-sinh(2*β)^-4)^(1/8) : 0.
+magofβ(model::Ising) = model.β > isingβc ? (1-sinh(2*model.β)^-4)^(1/8) : 0.
 
 """
     magofdβ(::Ising,β)
@@ -74,7 +72,7 @@ magofβ(::Ising, β) = β > isingβc ? (1-sinh(2*β)^-4)^(1/8) : 0.
 return the analytical result for the derivative of magnetisation at inverse temperature
 `β` for the 2d classical ising model.
 """
-magofdβ(::Ising, β) = β > isingβc ? (coth(2*β)*csch(2*β)^4)/(1-csch(2*β)^4)^(7/8) : 0.
+magofdβ(model::Ising) = model.β > isingβc ? (coth(2*model.β)*csch(2*model.β)^4)/(1-csch(2*model.β)^4)^(7/8) : 0.
 
 """
     eneofβ(::Ising,β)
@@ -82,7 +80,8 @@ magofdβ(::Ising, β) = β > isingβc ? (coth(2*β)*csch(2*β)^4)/(1-csch(2*β)^
 return some the numerical integrations of analytical result for the energy at inverse temperature
 `β` for the 2d classical ising model.
 """
-function eneofβ(::Ising, β)
+function eneofβ(model::Ising)
+    β = model.β
     if β == 0.0
         return 0
     elseif β == 0.2
@@ -104,7 +103,8 @@ end
 return some the numerical integrations of analytical result for the partition function at inverse temperature
 `β` for the 2d classical ising model.
 """
-function Zofβ(::Ising,β)
+function Zofβ(model::Ising)
+    β = model.β
     if β == 0.0
         return 2.0
     elseif β == 0.2

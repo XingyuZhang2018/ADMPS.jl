@@ -1,6 +1,4 @@
 # tensor for classical 2-d model
-const isingβc = log(1+sqrt(2))/2
-
 """
     tensorfromclassical(h::Matrix)
 
@@ -26,7 +24,8 @@ end
 return the isingtensor at inverse temperature `β` for a two-dimensional
 square lattice tensor-network.
 """
-function model_tensor(::Ising, β::Real)
+function model_tensor(model::Ising)
+    β = model.β
     a = reshape(Float64[1 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 1], 2,2,2,2)
     cβ, sβ = sqrt(cosh(β)), sqrt(sinh(β))
     q = 1/sqrt(2) * [cβ+sβ cβ-sβ; cβ-sβ cβ+sβ]
@@ -39,7 +38,8 @@ end
 return the operator for the magnetisation at inverse temperature `β`
 at a site in the two-dimensional ising model on a square lattice in tensor-network form.
 """
-function mag_tensor(::Ising, β)
+function mag_tensor(model::Ising)
+    β = model.β
     a = reshape(Float64[1 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 -1] , 2,2,2,2)
     cβ, sβ = sqrt(cosh(β)), sqrt(sinh(β))
     q = 1/sqrt(2) * [cβ+sβ cβ-sβ; cβ-sβ cβ+sβ]
@@ -52,7 +52,8 @@ end
 return the operator for the energy at inverse temperature `β`
 at a site in the two-dimensional ising model on a square lattice in tensor-network form.
 """
-function energy_tensor(::Ising, β)
+function energy_tensor(model::Ising)
+    β = model.β
     ham = [-1 1;1 -1]
     wboltzmann = exp.(-β .* ham)
     wenergy = ham .* wboltzmann

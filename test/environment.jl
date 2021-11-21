@@ -35,7 +35,7 @@ end
     β = rand(dtype)
     Au = atype(rand(dtype,D,d,D))
     Ad = atype(rand(dtype,D,d,D))
-    M = atype(model_tensor(Ising(),β))
+    M = atype(model_tensor(Ising(β)))
     
     λL,FL = leftenv(Au, Ad, M)
     @test λL * FL ≈ ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad)
