@@ -93,22 +93,22 @@ dAd  = -  FL  ── M ──  ξl
 ```
 """
 
-function ChainRulesCore.rrule(::typeof(leftenv), Au::AbstractArray{T}, Ad::AbstractArray{T}, M::AbstractArray{T}, FL::AbstractArray{T}; kwargs...) where {T}
-    λl, FL = leftenv(Au, Ad, M, FL)
-    # @show λl
-    function back((dλ, dFL))
-        dFL -= Array(ein"abc,abc ->"(conj(FL), dFL))[] * FL
-        ξl, info = linsolve(FR -> ein"((abc,ceh),dgeb),fgh -> adf"(Au, FR, M, Ad), conj(dFL), -λl, 1; maxiter = 1)
-        @assert info.converged==1
-        # errL = ein"abc,cba ->"(FL, ξl)[]
-        # abs(errL) > 1e-1 && throw("FL and ξl aren't orthometric. err = $(errL)")
-        dAu = -ein"((adf,fgh),dgeb),ceh -> abc"(FL, Ad, M, ξl) 
-        dAd = -ein"((adf,abc),dgeb),ceh -> fgh"(FL, Au, M, ξl)
-        dM = -ein"(adf,abc),(fgh,ceh) -> dgeb"(FL, Au, Ad, ξl)
-        return NoTangent(), conj(dAu), conj(dAd), conj(dM), NoTangent()...
-    end
-    return (λl, FL), back
-end
+# function ChainRulesCore.rrule(::typeof(leftenv), Au::AbstractArray{T}, Ad::AbstractArray{T}, M::AbstractArray{T}, FL::AbstractArray{T}; kwargs...) where {T}
+#     λl, FL = leftenv(Au, Ad, M, FL)
+#     # @show λl
+#     function back((dλ, dFL))
+#         dFL -= Array(ein"abc,abc ->"(conj(FL), dFL))[] * FL
+#         ξl, info = linsolve(FR -> ein"((abc,ceh),dgeb),fgh -> adf"(Au, FR, M, Ad), conj(dFL), -λl, 1; maxiter = 1)
+#         @assert info.converged==1
+#         # errL = ein"abc,cba ->"(FL, ξl)[]
+#         # abs(errL) > 1e-1 && throw("FL and ξl aren't orthometric. err = $(errL)")
+#         dAu = -ein"((adf,fgh),dgeb),ceh -> abc"(FL, Ad, M, ξl) 
+#         dAd = -ein"((adf,abc),dgeb),ceh -> fgh"(FL, Au, M, ξl)
+#         dM = -ein"(adf,abc),(fgh,ceh) -> dgeb"(FL, Au, Ad, ξl)
+#         return NoTangent(), conj(dAu), conj(dAd), conj(dM), NoTangent()...
+#     end
+#     return (λl, FL), back
+# end
 
 """
     function ChainRulesCore.rrule(::typeof(norm_FL), Au::AbstractArray{T}, Ad::AbstractArray{T}, FL::AbstractArray{T}; kwargs...) where {T}

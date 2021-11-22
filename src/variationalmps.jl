@@ -37,7 +37,8 @@ function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e
     mps /= norm(mps)
 end
 
-function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)
+function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)
+    D = size(M, 1)
     mps = init_mps(infolder = infolder, D = D, χ = χ, tol = tol, verbose = verbose)
     
     Au, Ad = mps, mps
@@ -71,7 +72,7 @@ function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile)
     flush(stdout)
 
     if savefile 
-        !(isdir(outfolder)) && mkdir(outfolder)
+        !(isdir(outfolder)) && mkpath(outfolder)
         logfile = open(outfolder*"/D$(D)_chi$(χ)_tol$(tol).log", "a")
         write(logfile, message)
         close(logfile)
@@ -80,15 +81,24 @@ function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile)
     return false
 end
 
-function optimisemps(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true,  mapsteps = 10)
+function optimisemps(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true,  mapsteps = 10, updown = true, downfromup = false)
+    Au = nothing
     Ad = nothing
+    Md = permutedims(M,(1,4,3,2))
     for i in 1:mapsteps
         if verbose 
-            message = "iter: $i   "
+            message = "iter: $i   \n"
             printstyled(message; bold=true, color=:red)
             flush(stdout)
         end
-        Ad = onestep(M; atype = atype, infolder = infolder, outfolder = outfolder, D = D, χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
+        direction = "↑"
+        Au = onestep(M; atype = atype, infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
+        if updown
+            !downfromup && (direction = "↓")
+            Ad = onestep(Md; atype = atype, infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
+        else
+            Ad = Au
+        end
     end
-    Ad
+    return Au, Ad
 end

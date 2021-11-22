@@ -1,7 +1,7 @@
 using LinearAlgebra
 using KrylovKit
 using OMEinsum
-
+using IterTools
 """
 tensor order graph: from left to right, top to bottom.
 ```
@@ -26,17 +26,19 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ┕──  Ad─       ┕──       f ────┴──── h 
 ```
 """
-function leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
-    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
-    if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
-        @show λs
-        if real(λs[1]) > 0
-            return real(λs[1]), real(FLs[1])
-        else
-            return real(λs[2]), real(FLs[2])
-        end
-    end
-    return λs[1], FLs[1]
+function leftenv(Au, Ad, M; FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))), kwargs...)
+    FL = nth(iterated(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad),ones(size(Au)...)),50)
+    # λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
+    #     @show λs
+    #     if real(λs[1]) > 0
+    #         return real(λs[1]), real(FLs[1])
+    #     else
+    #         return real(λs[2]), real(FLs[2])
+    #     end
+    # end
+    λs = [0]
+    return λs[1], FL
 end
 
 """
@@ -52,11 +54,11 @@ of `Au - M - Ad` contracted Aung the physical dimension.
  ─ Ad ──┘         ──┘      f ────┴──── h 
 ```
 """
-function rightenv(Au, Ad, M, FR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
+function rightenv(Au, Ad, M; FR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))),kwargs...)
     Au = permutedims(Au,(3,2,1))
     Ad = permutedims(Ad,(3,2,1))
     ML = permutedims(M,(3,2,1,4))
-    return leftenv(Au, Ad, ML, FR; kwargs...)
+    return leftenv(Au, Ad, ML; FR, kwargs...)
 end
 
 """
@@ -73,17 +75,18 @@ FL  │  =  λL FL                 │
 ```
 """
 function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Ad,1))); kwargs...)
-    λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,Au,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
-    if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
-        @show λs
-        if real(λs[1]) > 0
-            return real(λs[1]), real(FLs[1])
-        else
-            return real(λs[2]), real(FLs[2])
-        end
-    end
+    # λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,Au,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
+    #     @show λs
+    #     if real(λs[1]) > 0
+    #         return real(λs[1]), real(FLs[1])
+    #     else
+    #         return real(λs[2]), real(FLs[2])
+    #     end
+    # end
     # @show info,λs
-    return λs[1], FLs[1]
+    FL = nth(iterated(FL -> ein"(ad,acb),dce -> be"(FL,Au,Ad),ones(size(FL)...)),50)
+    return 0, FL
 end
 
 """

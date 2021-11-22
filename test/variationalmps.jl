@@ -33,32 +33,49 @@ end
 @testset "onestep optimize Ad with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
     seed_number = 100
     β = 0.8
-    D,χ = 2,10
+    χ = 10
     maxiter = 5
     infolder, outfolder = "./data/", "./data/"
     model = Ising(β)
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    Ad = onestep(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", D = D, χ = χ, verbose= true, savefile = false)
+    Ad = onestep(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, verbose= true, savefile = false)
     @test Ad !== nothing
 end
 
-@testset "optimize mps" for atype in [Array], dtype in [ComplexF64]
+@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64]
     seed_number = 100
     β = 0.8
     D,χ = 2,20
     mapsteps = 20
     infolder, outfolder = "./data/", "./data/"
-    !(isdir(outfolder)) && mkdir(outfolder)
 
     model = Ising(β)
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", D = D, χ = χ, mapsteps = mapsteps, verbose= true)
+    Au, Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, mapsteps = mapsteps, verbose= true, updown = false)
 
-    env = obs_env(M,Ad,conj(Ad))
+    env = obs_env(M,Au,Ad)
+    @test magnetisation(env,model) ≈ magofβ(model) atol=1e-6
+    @test energy(env,model) ≈ eneofβ(model) atol=1e-6
+end
+
+@testset "twoside optimize mps" for atype in [Array], dtype in [ComplexF64]
+    seed_number = 100
+    β = 0.8
+    D,χ = 2,20
+    mapsteps = 20
+    infolder, outfolder = "./data/", "./data/"
+
+    model = Ising(β)
+    M = atype{dtype}(model_tensor(model))
+    Random.seed!(seed_number)
+
+    Au, Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, mapsteps = mapsteps, verbose= true, downfromup = true)
+
+    env = obs_env(M,Au,Ad)
     @test magnetisation(env,model) ≈ magofβ(model) atol=1e-6
     @test energy(env,model) ≈ eneofβ(model) atol=1e-6
 end
