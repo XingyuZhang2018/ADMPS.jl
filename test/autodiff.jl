@@ -53,27 +53,6 @@ end
     @test ein"ab,ab -> "(ξR,R)[] ≈ 0 atol = 1e-9
 end
 
-@testset "linsolve with $atype{$dtype}" for atype in [Array], dtype in [Float64]
-    Random.seed!(10)
-    M = rand(ComplexF64,10,10)
-    λrs, rs = eigsolve(r -> ein"ab,b -> a"(M,r), rand(10), 10, :LM)
-    λr1, r1 = λrs[1], rs[1]
-    @show λrs, abs(λr1)
-    @test λr1*r1 ≈ ein"ab,b -> a"(M,r1)
-
-    loss(r) = -abs(ein"a,ab,b -> "(conj(r),M,r)[]/ein"a,a -> "(conj(r),r)[])
-    g(r) = Zygote.gradient(loss,r)[1]
-    r0 = rand(ComplexF64,10)
-    res = optimize(loss, g, 
-    r0, LBFGS(m = 20),inplace = false,
-        Optim.Options(f_tol=1e-6, iterations=100,
-        extended_trace=true)
-        )
-    r2 = Optim.minimizer(res) 
-    @show ein"ab,b -> a"(M,r2)./r2
-    @show loss(r2) res
-end
-
 @testset "loop_einsum mistake with $atype" for atype in [Array, CuArray]
     Random.seed!(100)
     D = 10
