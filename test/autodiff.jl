@@ -11,7 +11,7 @@ using Test
 using Zygote
 CUDA.allowscalar(false)
 
-@testset "Zygote with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64]
+@testset "Zygote with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64, ComplexF64]
     a = atype(randn(2,2))
     @test Zygote.gradient(norm, a)[1] ≈ num_grad(norm, a)
 
@@ -68,62 +68,53 @@ end
     @test Zygote.gradient(foo, 1)[1] ≈ num_grad(foo, 1) atol = 1e-8
 end
 
-@testset "leftenv and rightenv with $atype{$dtype}" for atype in [Array], dtype in [Float64]
+@testset "leftenv and rightenv with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64, ComplexF64]
     Random.seed!(100)
     d = 2
-    D = 10
+    D = 3
     Au = atype(rand(dtype,D,d,D))
     Ad = atype(rand(dtype,D,d,D))
 
-    S = atype(rand(D,d,D,D,d,D))
-    function foo1(β)
-        M = atype(model_tensor(Ising(β)))
-        Au *= β 
-        Ad *= β
+    S = atype(rand(ComplexF64,D,d,D,D,d,D))
+    M = atype(rand(dtype,d,d,d,d))
+    function foo1(M)
         _,FL = leftenv(Au, Ad, M)
         A = ein"(abc,abcdef),def -> "(FL,S,FL)
         B = ein"abc,abc -> "(FL,FL)
-        return Array(A)[]/Array(B)[]
+        return norm(Array(A)[]/Array(B)[])
     end 
-    @test Zygote.gradient(foo1, 1)[1] ≈ num_grad(foo1, 1) atol = 1e-8
+    @test Zygote.gradient(foo1, M)[1] ≈ num_grad(foo1, M) atol = 1e-8
 
-    function foo2(β)
-        M = atype(model_tensor(Ising(β)))
-        Au *= β 
-        Ad *= β
+    function foo2(M)
         _,FR = rightenv(Au, Ad, M)
         A = ein"(abc,abcdef),def -> "(FR,S,FR)
         B = ein"abc,abc -> "(FR,FR)
-        return Array(A)[]/Array(B)[]
+        return norm(Array(A)[]/Array(B)[])
     end
-    @test Zygote.gradient(foo2, 1)[1] ≈ num_grad(foo2, 1) atol = 1e-8
+    @test Zygote.gradient(foo2, M)[1] ≈ num_grad(foo2, M) atol = 1e-8
 end
 
-@testset "norm_FL and norm_FR with $atype{$dtype}" for atype in [Array], dtype in [Float64]
+@testset "norm_FL and norm_FR with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64, ComplexF64]
     Random.seed!(100)
     d = 2
-    D = 10
+    D = 3
     Au = atype(rand(dtype,D,d,D))
     Ad = atype(rand(dtype,D,d,D))
 
-    S = atype(rand(D,D,D,D))
-    function foo1(β)
-        Au *= β 
-        Ad *= β
+    S = atype(rand(dtype,D,D,D,D))
+    function foo1(Au)
         _,FL = norm_FL(Au, Ad)
         A = ein"(ab,abcd),cd -> "(FL,S,FL)
         B = ein"ab,ab -> "(FL,FL)
-        return Array(A)[]/Array(B)[]
+        return norm(Array(A)[]/Array(B)[])
     end 
-    @test Zygote.gradient(foo1, 1)[1] ≈ num_grad(foo1, 1) atol = 1e-8
+    @test Zygote.gradient(foo1, Au)[1] ≈ num_grad(foo1, Au) atol = 1e-8
 
-    function foo2(β)
-        Au *= β
-        Ad *= β
+    function foo2(Ad)
         _,FR = norm_FR(Au, Ad)
         A = ein"(ab,abcd),cd -> "(FR,S,FR)
         B = ein"ab,ab -> "(FR,FR)
-        return Array(A)[]/Array(B)[]
+        return norm(Array(A)[]/Array(B)[])
     end
-    @test Zygote.gradient(foo2, 1)[1] ≈ num_grad(foo2, 1) atol = 1e-8
+    @test Zygote.gradient(foo2, Ad)[1] ≈ num_grad(foo2, Ad) atol = 1e-8
 end

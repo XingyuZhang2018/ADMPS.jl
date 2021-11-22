@@ -27,12 +27,12 @@ CUDA.allowscalar(false)
     @test λL ≈ λR
 end
 
-@testset "leftenv and rightenv with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64]
+@testset "leftenv and rightenv with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64, ComplexF64]
     Random.seed!(100)
     d = 2
     D = 10
 
-    β = rand(dtype)
+    β = rand()
     Au = atype(rand(dtype,D,d,D))
     Ad = atype(rand(dtype,D,d,D))
     M = atype(model_tensor(Ising(β)))
@@ -44,7 +44,7 @@ end
     @test λR * FR ≈ ein"((abc,ceh),dgeb),fgh -> adf"(Au,FR,M,Ad)
 end
 
-@testset "normalization leftenv and rightenv with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64]
+@testset "normalization leftenv and rightenv with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64, ComplexF64]
     Random.seed!(100)
     d = 2
     D = 10

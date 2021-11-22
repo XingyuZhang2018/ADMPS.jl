@@ -18,11 +18,11 @@ using Zygote
 """
 function logoverlap(Au, Ad, M)
     Ad /= norm(Ad)
-    _, FL = leftenv(Au, Ad, M)
-    _, FR = rightenv(Au, Ad, M)
-    _, FLd_n = norm_FL(Ad, Ad)
-    _, FRd_n = norm_FR(Ad, Ad)
-    -(log(abs(ein"(((adf,abc),dgeb),fgh),ceh -> "(FL,Au,M,Ad,FR)[]/ein"abc,abc -> "(FL,FR)[])) - 1/2 * (log(ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,Ad,FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[])))
+    _, FL = leftenv(Au, conj(Ad), M)
+    _, FR = rightenv(Au, conj(Ad), M)
+    _, FLd_n = norm_FL(Ad, conj(Ad))
+    _, FRd_n = norm_FR(Ad, conj(Ad))
+    -(log(abs(ein"(((adf,abc),dgeb),fgh),ceh -> "(FL,Au,M,conj(Ad),FR)[]/ein"abc,abc -> "(FL,FR)[])) - 1/2 * (log(abs(ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]))))
 end
 
 function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
@@ -31,7 +31,7 @@ function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e
         mps = load(in_chkp_file)["mps"]
         verbose && println("load mps from $in_chkp_file")
     else
-        mps = rand(χ,D,χ)
+        mps = rand(ComplexF64,χ,D,χ)
         verbose && println("random initial mps $in_chkp_file")
     end
     mps /= norm(mps)

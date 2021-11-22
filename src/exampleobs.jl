@@ -29,7 +29,9 @@ function magnetisation(env, model::MT) where {MT <: HamiltonianModel}
     Mag = _arraytype(M)(mag_tensor(model))
     mag = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,Mag,FR,Ad)[]
     λ = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,Ad)[]
-    return mag/λ
+    magnet = mag/λ
+    @assert imag(magnet) < 1e-6
+    return real(magnet)
 end
 
 """
@@ -44,7 +46,9 @@ function energy(env,model::MT) where {MT <: HamiltonianModel}
     Ene = _arraytype(M)(energy_tensor(model))
     energy = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,Ene,FR,Ad)[]
     λ = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,Ad)[]
-    return energy/λ*2 # factor 2 for counting horizontal and vertical links
+    E = energy/λ*2 # factor 2 for counting horizontal and vertical links
+    @assert imag(E) < 1e-6
+    return real(E)
 end
 
 function overlap(env)
