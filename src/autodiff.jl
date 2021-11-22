@@ -7,7 +7,7 @@ using KrylovKit
 function ChainRulesCore.rrule(::typeof(Base.typed_hvcat), ::Type{T}, rows::Tuple{Vararg{Int}}, xs::S...) where {T,S}
     y = Base.typed_hvcat(T, rows, xs...)
     function back(ȳ)
-        return NO_FIELDS, NO_FIELDS, NO_FIELDS, permutedims(ȳ)...
+        return NoTangent(), NoTangent(), NoTangent(), permutedims(ȳ)...
     end
     return y, back
 end
@@ -17,7 +17,7 @@ end
 function ChainRulesCore.rrule(::typeof(LinearAlgebra.norm), A::AbstractArray)
     n = norm(A)
     function back(Δ)
-        return NO_FIELDS, Δ .* A ./ (n + eps(0f0)), NO_FIELDS
+        return NoTangent(), Δ .* A ./ (n + eps(0f0)), NoTangent()
     end
     return n, back
 end
@@ -57,7 +57,7 @@ function ChainRulesCore.rrule(::typeof(leftenv), Au::AbstractArray{T}, Ad::Abstr
         dAu = -ein"((adf,fgh),dgeb),ceh -> abc"(FL, Ad, M, ξl) 
         dAd = -ein"((adf,abc),dgeb),ceh -> fgh"(FL, Au, M, ξl)
         dM = -ein"(adf,abc),(fgh,ceh) -> dgeb"(FL, Au, Ad, ξl)
-        return NO_FIELDS, dAu, dAd, dM, NO_FIELDS...
+        return NoTangent(), dAu, dAd, dM, NoTangent()...
     end
     return (λl, FL), back
 end
@@ -96,7 +96,7 @@ function ChainRulesCore.rrule(::typeof(rightenv), Au::AbstractArray{T}, Ad::Abst
         dAu = -ein"((adf,fgh),dgeb),ceh -> abc"(ξr, Ad, M, FR) 
         dAd = -ein"((adf,abc),dgeb),ceh -> fgh"(ξr, Au, M, FR)
         dM = -ein"(adf,abc),(fgh,ceh) -> dgeb"(ξr, Au, Ad, FR)
-        return NO_FIELDS, dAu, dAd, dM, NO_FIELDS...
+        return NoTangent(), dAu, dAd, dM, NoTangent()...
     end
     return (λr, FR), back
 end
@@ -128,7 +128,7 @@ function ChainRulesCore.rrule(::typeof(norm_FL), Au::AbstractArray{T}, Ad::Abstr
         # abs(errL) > 1e-1 && throw("FL and ξl aren't orthometric. err = $(errL)")
         dAu = -ein"(ad,dce), be -> acb"(FL, Ad, ξl) 
         dAd = -ein"(ad,acb), be -> dce"(FL, Au, ξl)
-        return NO_FIELDS, dAu, dAd, NO_FIELDS...
+        return NoTangent(), dAu, dAd, NoTangent()...
     end
     return (λl, FL), back
 end
@@ -166,7 +166,7 @@ function ChainRulesCore.rrule(::typeof(norm_FR), Au::AbstractArray{T}, Ad::Abstr
         # abs(errR) > 1e-1 && throw("FR and ξr aren't orthometric. err = $(errR) $(info)")
         dAu = -ein"(ad,dce), be -> acb"(ξr, Ad, FR) 
         dAd = -ein"(ad,acb), be -> dce"(ξr, Au, FR)
-        return NO_FIELDS, dAu, dAd, NO_FIELDS...
+        return NoTangent(), dAu, dAd, NoTangent()...
     end
     return (λr, FR), back
 end

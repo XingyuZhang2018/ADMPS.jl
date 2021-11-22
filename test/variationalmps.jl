@@ -1,5 +1,5 @@
 using ADMPS
-using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap, onestep, isingβc
+using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps
 using CUDA
 using KrylovKit
 using LinearAlgebra: svd, norm
@@ -50,6 +50,7 @@ end
     D,χ = 2,20
     mapsteps = 20
     infolder, outfolder = "./data/", "./data/"
+    !(isdir(outfolder)) && mkdir(outfolder)
 
     model = Ising(β)
     M = atype(model_tensor(model))

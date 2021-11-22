@@ -1,3 +1,4 @@
+using OMEinsum
 # tensor for classical 2-d model
 """
     tensorfromclassical(h::Matrix)
