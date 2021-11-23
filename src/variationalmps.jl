@@ -17,12 +17,16 @@ using Zygote
 ````
 """
 function logoverlap(Au, Ad, M)
-    Ad /= norm(Ad)
-    _, FL = leftenv(Au, conj(Ad), M)
-    _, FR = rightenv(Au, conj(Ad), M)
+    # Ad /= norm(Ad)
+    _, FLud = leftenv(Au, conj(Ad), M)
+    _, FRud = rightenv(Au, conj(Ad), M)
     _, FLd_n = norm_FL(Ad, conj(Ad))
     _, FRd_n = norm_FR(Ad, conj(Ad))
-    -(log(abs(ein"(((adf,abc),dgeb),fgh),ceh -> "(FL,Au,M,conj(Ad),FR)[]/ein"abc,abc -> "(FL,FR)[])) - 1/2 * (log(abs(ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]))))
+
+    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
+    Ad /= sqrt(nd)
+    AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
+    -log(abs2(AuM))
 end
 
 function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
@@ -34,7 +38,11 @@ function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e
         mps = rand(ComplexF64,χ,D,χ)
         verbose && println("random initial mps $in_chkp_file")
     end
-    mps /= norm(mps)
+    _, FL_n = norm_FL(mps, conj(mps))
+    _, FR_n = norm_FR(mps, conj(mps))
+    n = ein"(ad,acb),(dce,be) ->"(FL_n,mps,conj(mps),FR_n)[]/ein"ab,ab ->"(FL_n,FR_n)[]
+    mps /= sqrt(n)
+    return mps
 end
 
 function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)
@@ -55,9 +63,18 @@ function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolde
         Ad, optimmethod,inplace = false,
         Optim.Options(f_tol=f_tol, iterations=opiter,
         extended_trace=true,
-        callback=os->writelog(os, outfolder, D, χ, tol, savefile)),
+        callback=os->writelog(os, outfolder, D, χ, tol, savefile, verbose)),
         )
     Ad = Optim.minimizer(res)
+    _, FLud_n = norm_FL(Au, conj(Ad))
+    _, FRud_n = norm_FR(Au, conj(Ad))
+    fidelity = norm(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
+    if verbose 
+        message = "fidelity   = $(fidelity) \ndifference = $(norm(Au-Ad)) \n"
+        printstyled(message; bold=true, color=:green)
+        flush(stdout)
+    end
+    return Ad
 end
 
 """
@@ -65,11 +82,13 @@ end
 
 return the optimise infomation of each step, including `time` `iteration` `energy` and `g_norm`, saved in `/data/model_D_chi_tol_maxiter.log`. Save the final `ipeps` in file `/data/model_D_chi_tol_maxiter.jid2`
 """
-function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile)
+function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile, verbose)
     message = "$(round(os.metadata["time"],digits=1))    $(os.iteration)    $(round(os.value,digits=8))    $(round(os.g_norm,digits=8))\n"
 
-    printstyled(message; bold=true, color=:blue)
-    flush(stdout)
+    if verbose
+        printstyled(message; bold=true, color=:blue)
+        flush(stdout)
+    end
 
     if savefile 
         !(isdir(outfolder)) && mkpath(outfolder)

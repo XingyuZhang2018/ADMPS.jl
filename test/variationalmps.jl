@@ -60,6 +60,7 @@ end
     env = obs_env(M,Au,Ad)
     @test magnetisation(env,model) ≈ magofβ(model) atol=1e-6
     @test energy(env,model) ≈ eneofβ(model) atol=1e-6
+    # @show energy(env,model)+1.414213779415974 # β = isingβc
 end
 
 @testset "twoside optimize mps" for atype in [Array], dtype in [ComplexF64]
