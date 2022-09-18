@@ -66,6 +66,11 @@ function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolde
         callback=os->writelog(os, outfolder, D, χ, tol, savefile, verbose)),
         )
     Ad = Optim.minimizer(res)
+    _, FLd_n = norm_FL(Ad, conj(Ad))
+    _, FRd_n = norm_FR(Ad, conj(Ad))
+    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
+    Ad /= sqrt(nd)
+    
     _, FLud_n = norm_FL(Au, conj(Ad))
     _, FRud_n = norm_FR(Au, conj(Ad))
     fidelity = norm(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
