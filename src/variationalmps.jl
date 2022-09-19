@@ -71,7 +71,24 @@ function compress_fidelity(Au, Ad, M)
     _, FLud = leftenv(Au, conj(Ad), M)
     _, FRud = rightenv(Au, conj(Ad), M)
     AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
-    abs2(AuM)
+    norm(AuM)
+end
+
+
+function overlap(Au, Ad)
+    _, FLu_n = norm_FL(Au, conj(Au))
+    _, FRu_n = norm_FR(Au, conj(Au))
+    _, FLd_n = norm_FL(Ad, conj(Ad))
+    _, FRd_n = norm_FR(Ad, conj(Ad))
+
+    nu = ein"(ad,acb),(dce,be) ->"(FLu_n,Au,conj(Au),FRu_n)[]/ein"ab,ab ->"(FLu_n,FRu_n)[]
+    Au /= sqrt(nu)
+    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
+    Ad /= sqrt(nd)
+
+    _, FLud_n = norm_FL(Au, conj(Ad))
+    _, FRud_n = norm_FR(Au, conj(Ad))
+    norm(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
 end
 
 function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
@@ -112,9 +129,8 @@ function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolde
         )
     Ad = Optim.minimizer(res)
 
-    fidelity = compress_fidelity(Au, Ad, M)
     if verbose 
-        message = "compress fidelity   = $(fidelity) \ndifference = $(norm(Au-Ad)) \n"
+        message = "compress fidelity   = $(compress_fidelity(Au, Ad, M))\npower overlap = $(overlap(Au, Ad)) \n"
         printstyled(message; bold=true, color=:green)
         flush(stdout)
     end
@@ -159,6 +175,11 @@ function optimisemps(M::AbstractArray; atype = Array, infolder = "./data/", outf
         if updown
             !downfromup && (direction = "↓")
             Ad = onestep(Md; atype = atype, infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
+            if verbose
+                message = "AuAd overlap = $(overlap(Au, Ad)) \n"
+                printstyled(message; bold=true, color=:red)
+                flush(stdout)
+            end
         else
             Ad = Au
         end
