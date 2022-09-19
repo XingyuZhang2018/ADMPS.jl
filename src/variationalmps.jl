@@ -60,18 +60,19 @@ function compress_fidelity(Au, Ad, M)
     _, FLd_n = norm_FL(Ad, conj(Ad))
     _, FRd_n = norm_FR(Ad, conj(Ad))
 
-    _, FL4ud = bigleftenv( Au, conj(Au), M)
-    _, FR4ud = bigrightenv(Au, conj(Au), M)
+    Md = permutedims(conj(M),(1,4,3,2))
+    _, FL4ud = bigleftenv( Au, conj(Au), M, Md)
+    _, FR4ud = bigrightenv(Au, conj(Au), M, Md)
 
     nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
     Ad /= sqrt(nd)
-    nu = ein"((((adgj,abc),dfeb),gihf),jik),cehk -> "(FL4ud,Au,M,M,conj(Au),FR4ud)[]/ein"abcd,abcd ->"(FL4ud,FR4ud)[]
+    nu = ein"((((adgj,abc),dfeb),gihf),jik),cehk -> "(FL4ud,Au,M,Md,conj(Au),FR4ud)[]/ein"abcd,abcd ->"(FL4ud,FR4ud)[]
     Au /= sqrt(nu)
 
     _, FLud = leftenv(Au, conj(Ad), M)
     _, FRud = rightenv(Au, conj(Ad), M)
     AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
-    norm(AuM)
+    abs2(AuM)
 end
 
 
@@ -88,7 +89,7 @@ function overlap(Au, Ad)
 
     _, FLud_n = norm_FL(Au, conj(Ad))
     _, FRud_n = norm_FR(Au, conj(Ad))
-    norm(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
+    abs2(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
 end
 
 function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)

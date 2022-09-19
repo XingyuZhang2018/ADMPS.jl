@@ -68,9 +68,9 @@ end
     Ad = atype(rand(dtype,D,d,D))
     M = atype(model_tensor(Ising(β)))
     
-    λL,FL4 = bigleftenv(Au, Ad, M)
+    λL,FL4 = bigleftenv(Au, Ad, M, M)
     @test λL * FL4 ≈ ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,M,M,Ad)
 
-    λR,FR4 = bigrightenv(Au, Ad, M)
+    λR,FR4 = bigrightenv(Au, Ad, M, M)
     @test λR * FR4 ≈ ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,M,M,Ad)
 end

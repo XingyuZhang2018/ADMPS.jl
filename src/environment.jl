@@ -126,8 +126,8 @@ FL4 │    = λL FL4     │     f     │
 ┕── Ad─       ┕──     j ────┴──── k          
 ```
 """
-function bigleftenv(Au, Ad, M, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
-    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,M,M,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
+function bigleftenv(Au, Ad, Mu, Md, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Mu,1), size(Md,1), size(Ad,1))); kwargs...)
+    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,Mu,Md,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
     # @show λFL4s
     return λFL4s[1], FL4s[1]
 end
@@ -146,8 +146,8 @@ of `AR - M - conj(AR)`` contracted along the physical dimension.
  ─ AR──┘         ──┘    j ────┴──── k
 ```
 """
-function bigrightenv(Au, Ad, M, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,3), size(Ad,1))); kwargs...)
-    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,M,M,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
+function bigrightenv(Au, Ad, Mu, Md, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Mu,3), size(Md,3), size(Ad,1))); kwargs...)
+    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,Mu,Md,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
     # @show λFR4s
     return λFR4s[1], FR4s[1]
 end
