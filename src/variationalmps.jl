@@ -1,7 +1,7 @@
 using FileIO
 using JLD2
 using Optim, LineSearches
-using LinearAlgebra: I, norm
+using LinearAlgebra: I, norm, tr
 using TimerOutputs
 using OMEinsum: get_size_dict, optimize_greedy,  MinSpaceDiff
 using Zygote
@@ -17,7 +17,23 @@ using Zygote
 ````
 """
 function logoverlap(Au, Ad, M)
-    # Ad /= norm(Ad)
+    # χ, D,  = size(Au)
+    Ad /= norm(Ad)
+    # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
+    # 工dd_m = reshape(工dd, χ^2,   χ^2  )
+    # nd   = tr(工dd_m*工dd_m)
+    # Ad /= sqrnd
+
+    # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
+    # 工dd_m = reshape(工dd, χ^2,   χ^2  )
+    # nd   = tr(工dd_m*工dd_m)
+    # @show nd
+    # 王ud = ein"(acb,dfec),gfh->adgbeh"(Au,M,conj(Ad))
+    # 工ud = ein"acb,dce->adbe"(Au,conj(Ad))
+    # 王ud_m = reshape(王ud, χ^2*D, χ^2*D)
+    # 工ud_m = reshape(工ud, χ^2,   χ^2  )
+
+    # -log(abs2(tr(王ud_m*王ud_m)/tr(工ud_m*工ud_m)))
     _, FLud = leftenv(Au, conj(Ad), M)
     _, FRud = rightenv(Au, conj(Ad), M)
     _, FLd_n = norm_FL(Ad, conj(Ad))
@@ -27,6 +43,35 @@ function logoverlap(Au, Ad, M)
     Ad /= sqrt(nd)
     AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
     -log(abs2(AuM))
+end
+
+"""
+````
+    a ────┬──── c
+    │     b     │
+    ├─ d ─┼─ e ─┤
+    │     f     │
+    ├─ g ─┼─ h ─┤
+    │     i     │
+    j ────┴──── k
+````
+"""
+function compress_fidelity(Au, Ad, M)
+    _, FLd_n = norm_FL(Ad, conj(Ad))
+    _, FRd_n = norm_FR(Ad, conj(Ad))
+
+    _, FL4ud = bigleftenv( Au, conj(Au), M)
+    _, FR4ud = bigrightenv(Au, conj(Au), M)
+
+    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
+    Ad /= sqrt(nd)
+    nu = ein"((((adgj,abc),dfeb),gihf),jik),cehk -> "(FL4ud,Au,M,M,conj(Au),FR4ud)[]/ein"abcd,abcd ->"(FL4ud,FR4ud)[]
+    Au /= sqrt(nu)
+
+    _, FLud = leftenv(Au, conj(Ad), M)
+    _, FRud = rightenv(Au, conj(Ad), M)
+    AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
+    abs2(AuM)
 end
 
 function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
@@ -66,16 +111,10 @@ function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolde
         callback=os->writelog(os, outfolder, D, χ, tol, savefile, verbose)),
         )
     Ad = Optim.minimizer(res)
-    _, FLd_n = norm_FL(Ad, conj(Ad))
-    _, FRd_n = norm_FR(Ad, conj(Ad))
-    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
-    Ad /= sqrt(nd)
-    
-    _, FLud_n = norm_FL(Au, conj(Ad))
-    _, FRud_n = norm_FR(Au, conj(Ad))
-    fidelity = norm(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
+
+    fidelity = compress_fidelity(Au, Ad, M)
     if verbose 
-        message = "fidelity   = $(fidelity) \ndifference = $(norm(Au-Ad)) \n"
+        message = "compress fidelity   = $(fidelity) \ndifference = $(norm(Au-Ad)) \n"
         printstyled(message; bold=true, color=:green)
         flush(stdout)
     end

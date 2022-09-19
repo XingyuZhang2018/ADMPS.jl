@@ -9,7 +9,15 @@ a ────┬──── c    a──────┬──────b
 │     b     │    │      │      │                     
 ├─ d ─┼─ e ─┤    │      c      │                  
 │     g     │    │      │      │  
-f ────┴──── h    d──────┴──────e    
+f ────┴──── h    d──────┴──────e   
+
+a ────┬──── c  
+│     b     │
+├─ d ─┼─ e ─┤
+│     f     │
+├─ g ─┼─ h ─┤           
+│     i     │
+j ────┴──── k     
 ```
 """
 
@@ -102,4 +110,44 @@ function norm_FR(Au, Ad, FR = _arraytype(Au)(randn(eltype(Au), size(Au,3), size(
     Au = permutedims(Au,(3,2,1))
     Ad = permutedims(Ad,(3,2,1))
     return norm_FL(Au, Ad, FR; kwargs...)
+end
+
+"""
+    λ, FL4 = bigleftenv(AL, M, FL4 = rand(eltype(AL), size(AL,1), size(M,1), size(M,1), size(AL,1)); kwargs...)
+Compute the left environment tensor for MPS `AL` and MPO `M`, by finding the left fixed point
+of `AL - M - M - conj(AL)` contracted along the physical dimension.
+```
+┌── Au─       ┌──     a ────┬──── c      
+│   │         │       │     b     │      
+│── M ─       │──     ├─ d ─┼─ e ─┤  
+FL4 │    = λL FL4     │     f     │
+│── M ─       │──     ├─ g ─┼─ h ─┤           
+│   │         │       │     i     │
+┕── Ad─       ┕──     j ────┴──── k          
+```
+"""
+function bigleftenv(Au, Ad, M, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
+    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,M,M,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
+    # @show λFL4s
+    return λFL4s[1], FL4s[1]
+end
+
+"""
+    λ, FR4 = bigrightenv(AR, M, FR4 = randn(eltype(AR), size(AR,1), size(M,3), size(M,3), size(AR,1)); kwargs...)
+Compute the right environment tensor for MPS `AR` and MPO `M`, by finding the right fixed point
+of `AR - M - conj(AR)`` contracted along the physical dimension.
+```
+ ─ AR──┐         ──┐    a ────┬──── c
+   │   │           │    │     b     │
+ ─ M ──│         ──│    ├─ d ─┼─ e ─┤
+   │  FR4   = λR  FR4   │     f     │
+ ─ M ──│         ──│    ├─ g ─┼─ h ─┤
+   │   │           │    │     i     │
+ ─ AR──┘         ──┘    j ────┴──── k
+```
+"""
+function bigrightenv(Au, Ad, M, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,3), size(Ad,1))); kwargs...)
+    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,M,M,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
+    # @show λFR4s
+    return λFR4s[1], FR4s[1]
 end

@@ -1,5 +1,5 @@
 using ADMPS
-using ADMPS:leftenv,rightenv,norm_FL,norm_FR
+using ADMPS:leftenv,rightenv,norm_FL,norm_FR, bigleftenv, bigrightenv
 using CUDA
 using KrylovKit
 using LinearAlgebra
@@ -56,4 +56,21 @@ end
     @test λL * FL ≈ ein"(ad,acb), dce -> be"(FL,Au,Ad)
     λR,FR = norm_FR(Au, Ad)
     @test λR * FR ≈ ein"(be,acb), dce -> ad"(FR,Au,Ad)
+end
+
+@testset "bigleftenv and bigrightenv with $atype{$dtype}" for atype in [Array, CuArray], dtype in [Float64, ComplexF64]
+    Random.seed!(100)
+    d = 2
+    D = 10
+
+    β = rand()
+    Au = atype(rand(dtype,D,d,D))
+    Ad = atype(rand(dtype,D,d,D))
+    M = atype(model_tensor(Ising(β)))
+    
+    λL,FL4 = bigleftenv(Au, Ad, M)
+    @test λL * FL4 ≈ ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,M,M,Ad)
+
+    λR,FR4 = bigrightenv(Au, Ad, M)
+    @test λR * FR4 ≈ ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,M,M,Ad)
 end

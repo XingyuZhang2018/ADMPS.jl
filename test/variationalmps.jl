@@ -5,7 +5,6 @@ using KrylovKit
 using LinearAlgebra: svd, norm
 using LineSearches, Optim
 using OMEinsum
-using Plots
 using Random
 using Test
 using Zygote
