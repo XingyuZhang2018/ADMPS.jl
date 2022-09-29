@@ -18,7 +18,7 @@ using Zygote
 """
 function logoverlap(Au, Ad, M)
     # χ, D,  = size(Au)
-    Ad /= norm(Ad)
+    # Ad /= norm(Ad)
     # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
     # 工dd_m = reshape(工dd, χ^2,   χ^2  )
     # nd   = tr(工dd_m*工dd_m)
@@ -42,7 +42,7 @@ function logoverlap(Au, Ad, M)
     nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
     Ad /= sqrt(nd)
     AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
-    -log(abs2(AuM))
+    -log(abs(AuM))
 end
 
 """
@@ -132,7 +132,7 @@ function onestep(M::AbstractArray; infolder = "./data/", outfolder = "./data/", 
     Ad = Optim.minimizer(res)
 
     if verbose 
-        message = "compress fidelity   = $(compress_fidelity(Au, Ad, M))\npower overlap = $(overlap(Au, Ad)) \n"
+        message = "compress error   = $(-log(compress_fidelity(Au, Ad, M)))\npower error = $(-log(overlap(Au, Ad))) \n"
         printstyled(message; bold=true, color=:green)
         flush(stdout)
     end
