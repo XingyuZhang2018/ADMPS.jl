@@ -92,13 +92,13 @@ function overlap(Au, Ad)
     abs2(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
 end
 
-function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
+function init_mps(;infolder = "./data/", atype = Array, D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
     in_chkp_file = infolder*"/D$(D)_chi$(χ)_tol$(tol).jld2"
     if isfile(in_chkp_file)
-        mps = load(in_chkp_file)["mps"]
+        mps =  atype(load(in_chkp_file)["mps"])
         verbose && println("load mps from $in_chkp_file")
     else
-        mps = rand(ComplexF64,χ,D,χ)
+        mps = atype(rand(ComplexF64,χ,D,χ))
         verbose && println("random initial mps $in_chkp_file")
     end
     _, FL_n = norm_FL(mps, conj(mps))
@@ -108,15 +108,16 @@ function init_mps(;infolder = "./data/", D::Int = 2, χ::Int = 5, tol::Real = 1e
     return mps
 end
 
-function onestep(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)
+function onestep(M::AbstractArray; infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)
     D = size(M, 1)
-    mps = init_mps(infolder = infolder, D = D, χ = χ, tol = tol, verbose = verbose)
+    atype = _arraytype(M)
+    mps = init_mps(infolder = infolder, atype = atype, D = D, χ = χ, tol = tol, verbose = verbose)
     
     Au, Ad = mps, mps
     to = TimerOutput()
     f(Ad) = @timeit to "forward" logoverlap(Au, Ad, M)
     ff(Ad) = logoverlap(Au, Ad, M)
-    g(Ad) = @timeit to "backward" Zygote.gradient(ff,atype(Ad))[1]
+    g(Ad) = @timeit to "backward" Zygote.gradient(ff,Ad)[1]
     if verbose 
         message = "time  iter   loss           grad_norm\n"
         printstyled(message; bold=true, color=:blue)
@@ -156,12 +157,12 @@ function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile, verbos
         logfile = open(outfolder*"/D$(D)_chi$(χ)_tol$(tol).log", "a")
         write(logfile, message)
         close(logfile)
-        save(outfolder*"/D$(D)_chi$(χ)_tol$(tol).jld2", "mps", os.metadata["x"])
+        save(outfolder*"/D$(D)_chi$(χ)_tol$(tol).jld2", "mps", Array(os.metadata["x"]))
     end
     return false
 end
 
-function optimisemps(M::AbstractArray; atype = Array, infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true,  mapsteps = 10, updown = true, downfromup = false)
+function optimisemps(M::AbstractArray; infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true,  mapsteps = 10, updown = true, downfromup = false)
     Au = nothing
     Ad = nothing
     Md = permutedims(M,(1,4,3,2))
@@ -172,10 +173,10 @@ function optimisemps(M::AbstractArray; atype = Array, infolder = "./data/", outf
             flush(stdout)
         end
         direction = "↑"
-        Au = onestep(M; atype = atype, infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
+        Au = onestep(M; infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
         if updown
             !downfromup && (direction = "↓")
-            Ad = onestep(Md; atype = atype, infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
+            Ad = onestep(Md; infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
             if verbose
                 message = "AuAd overlap = $(overlap(Au, Ad)) \n"
                 printstyled(message; bold=true, color=:red)
