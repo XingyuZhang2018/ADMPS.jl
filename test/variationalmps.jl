@@ -1,5 +1,5 @@
 using ADMPS
-using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps
+using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps, gradient_exact, initial_canonical_VL
 using CUDA
 using KrylovKit
 using LinearAlgebra: svd, norm
@@ -29,7 +29,7 @@ using Zygote
     @test gradzygote ≈ gradnum atol=1e-5
 end
 
-@testset "onestep optimize Ad with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
+@testset "onestep optimize Ad with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64], manifold in [Flat(), Grassmann()]
     seed_number = 100
     β = 0.8
     χ = 10
@@ -39,11 +39,12 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    Ad = onestep(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, verbose= true, savefile = false)
+    Ad = onestep(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, verbose= true, savefile = false, optimmethod = LBFGS(manifold=manifold))
+    manifold == Grassmann() && (@test ein"abc,abd->cd"(Ad, conj(Ad)) ≈ I(χ))
     @test Ad !== nothing
 end
 
-@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64]
+@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64], manifold in [Flat(), Grassmann()]
     seed_number = 100
     β = 0.8
     D,χ = 2,20
@@ -54,7 +55,7 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    Au, Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, mapsteps = mapsteps, verbose= true, updown = false)
+    Au, Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, mapsteps = mapsteps, verbose= true, updown = false, optimmethod = LBFGS(manifold=manifold))
 
     env = obs_env(M,Au,Ad)
     @test magnetisation(env,model) ≈ magofβ(model) atol=1e-6

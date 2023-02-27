@@ -2,6 +2,7 @@ using FileIO
 using JLD2
 using Optim, LineSearches
 using LinearAlgebra: I, norm, tr
+using TeneT: leftorth, qrpos
 using TimerOutputs
 using OMEinsum: get_size_dict, optimize_greedy,  MinSpaceDiff
 using Zygote
@@ -17,32 +18,27 @@ using Zygote
 ````
 """
 function logoverlap(Au, Ad, M)
-    # χ, D,  = size(Au)
-    # Ad /= norm(Ad)
-    # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
-    # 工dd_m = reshape(工dd, χ^2,   χ^2  )
-    # nd   = tr(工dd_m*工dd_m)
-    # Ad /= sqrnd
-
-    # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
-    # 工dd_m = reshape(工dd, χ^2,   χ^2  )
-    # nd   = tr(工dd_m*工dd_m)
-    # @show nd
-    # 王ud = ein"(acb,dfec),gfh->adgbeh"(Au,M,conj(Ad))
-    # 工ud = ein"acb,dce->adbe"(Au,conj(Ad))
-    # 王ud_m = reshape(王ud, χ^2*D, χ^2*D)
-    # 工ud_m = reshape(工ud, χ^2,   χ^2  )
-
-    # -log(abs2(tr(王ud_m*王ud_m)/tr(工ud_m*工ud_m)))
-    _, FLud = leftenv(Au, conj(Ad), M)
-    _, FRud = rightenv(Au, conj(Ad), M)
-    _, FLd_n = norm_FL(Ad, conj(Ad))
-    _, FRd_n = norm_FR(Ad, conj(Ad))
+    _, FLud = Zygote.@ignore leftenv(Au, conj(Ad), M)
+    _, FRud = Zygote.@ignore rightenv(Au, conj(Ad), M)
+    _, FLd_n = Zygote.@ignore norm_FL(Ad, conj(Ad))
+    _, FRd_n = Zygote.@ignore norm_FR(Ad, conj(Ad))
 
     nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
     Ad /= sqrt(nd)
     AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
     -log(abs(AuM))
+end
+
+function gradient_exact(Au, Ad, M)
+    _, FLud = leftenv(Au, conj(Ad), M)
+    _, FRud = rightenv(Au, conj(Ad), M)
+    # _, FLd_n = norm_FL(Ad, conj(Ad))
+    # _, FRd_n = norm_FR(Ad, conj(Ad))
+
+    # nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
+    # Ad /= sqrt(nd)
+    AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
+    -conj(AuM/(abs(AuM)^2)*conj(ein"((adf,abc),dgeb),ceh -> fgh"(FLud,Au,M,FRud) / ein"abc,abc -> "(FLud,FRud)[]))
 end
 
 """
@@ -95,17 +91,18 @@ end
 function init_mps(;infolder = "./data/", atype = Array, D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
     in_chkp_file = infolder*"/D$(D)_chi$(χ)_tol$(tol).jld2"
     if isfile(in_chkp_file)
-        mps =  atype(load(in_chkp_file)["mps"])
+        A =  atype(load(in_chkp_file)["mps"])
         verbose && println("load mps from $in_chkp_file")
     else
-        mps = atype(rand(ComplexF64,χ,D,χ))
+        A = atype(rand(ComplexF64,χ,D,χ))
         verbose && println("random initial mps $in_chkp_file")
+        AL, _, _ = leftorth(reshape(A, (χ,D,χ,1,1)))
+        AL = reshape(AL, (χ,D,χ))
     end
-    _, FL_n = norm_FL(mps, conj(mps))
-    _, FR_n = norm_FR(mps, conj(mps))
-    n = ein"(ad,acb),(dce,be) ->"(FL_n,mps,conj(mps),FR_n)[]/ein"ab,ab ->"(FL_n,FR_n)[]
-    mps /= sqrt(n)
-    return mps
+
+    AL, _, _ = leftorth(reshape(A, (χ,D,χ,1,1)))
+    AL = reshape(AL, (χ,D,χ))
+    return AL
 end
 
 function onestep(M::AbstractArray; infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)

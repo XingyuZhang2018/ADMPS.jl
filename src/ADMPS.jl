@@ -12,5 +12,6 @@ include("exampleobs.jl")
 include("environment.jl")
 include("autodiff.jl")
 include("variationalmps.jl")
+include("grassmann.jl")
 
 end
