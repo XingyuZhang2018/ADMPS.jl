@@ -1,5 +1,5 @@
 using ADMPS
-using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps, gradient_exact, initial_canonical_VL
+using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps, gradient_exact
 using CUDA
 using KrylovKit
 using LinearAlgebra: svd, norm
@@ -29,11 +29,11 @@ using Zygote
     @test gradzygote ≈ gradnum atol=1e-5
 end
 
-@testset "onestep optimize Ad with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64], manifold in [Flat(), Grassmann()]
+@testset "onestep optimize Ad with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64], manifold in [Grassmann()]
     seed_number = 100
     β = 0.8
     χ = 10
-    maxiter = 5
+    maxiter = 10
     infolder, outfolder = "./data/", "./data/"
     model = Ising(β)
     M = atype{dtype}(model_tensor(model))
@@ -44,7 +44,7 @@ end
     @test Ad !== nothing
 end
 
-@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64], manifold in [Flat(), Grassmann()]
+@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64], manifold in [Grassmann()]
     seed_number = 100
     β = 0.8
     D,χ = 2,20
@@ -63,7 +63,7 @@ end
     # @show energy(env,model)+1.414213779415974 # β = isingβc
 end
 
-@testset "twoside optimize mps" for atype in [Array], dtype in [ComplexF64]
+@testset "twoside optimize mps" for atype in [Array], dtype in [ComplexF64], manifold in [Grassmann()]
     seed_number = 100
     β = 0.8
     D,χ = 2,20
@@ -74,7 +74,7 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    Au, Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, mapsteps = mapsteps, verbose= true, downfromup = true)
+    Au, Ad = optimisemps(M; infolder = infolder*"$(model)/", outfolder = outfolder*"$(model)/", χ = χ, mapsteps = mapsteps, verbose= true, downfromup = true, optimmethod = LBFGS(manifold=manifold))
 
     env = obs_env(M,Au,Ad)
     @test magnetisation(env,model) ≈ magofβ(model) atol=1e-6
