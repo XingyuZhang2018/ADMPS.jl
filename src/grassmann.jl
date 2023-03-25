@@ -1,29 +1,50 @@
-import Optim: project_tangent, project_tangent!, retract!, Manifold
+using LinearAlgebra, OMEinsum
+export projectisometric!, projectcomplement!, retract, transport!, precondition
 
-struct Grassmann <: Manifold
+function projectcomplement!(g, x)
+    P = adjoint(x)*g
+    g = mul!(g,x,P,-1.0,true)
+    return g
+end 
+
+function projectisometric!(x)
+    U, S, V = svd(x,full=false)
+    return mul!(x,U,V') # x=U*V'
 end
 
-"""
-    Project a vector g onto a Grassmann (ij)(k) manifold at point x
-    x: shape: (i,j)(k)
-    g: shape: (i,j)(k)
-"""
-project_tangent(M::Grassmann, g, x) = project_tangent!(M::Grassmann, copy(g), x)
-function project_tangent!(::Grassmann, g, x)
-    g .-= ein"deg,(abc,abg)->dec"(x, g, conj(x)) 
+function retract(W, G, α)
+    U, S, V = svd(G)
+    WVd = W*V'
+    cSV, sSV = Diagonal(cos.(α.*S))*V, Diagonal(sin.(α.*S)) * V'  # sin(S)*V, cos(S)*V'
+    W′ = projectisometric!(WVd*cSV + U*sSV)
+    sSSV = lmul!(Diagonal(S), sSV)
+    cSSV = lmul!(Diagonal(S), cSV)
+    Z′ = projectcomplement!(U*cSSV - WVd*sSSV, W′)
+    return W′, Z′
 end
 
-"""
-    Retrct a vector g onto a Grassmann manifold at point x.
-     This is a SVD based retraction and same as it in the Stiefel manifold.
-"""
-function retract!(::Grassmann, x)
-    χ,d,_ = size(x)
-    # bad retract!
-    # F = svd(reshape(x,(χ*d,χ)))
-    # x .= reshape(F.U * F.V, (χ,d,χ))
+function precondition(x,g)
+    χ = size(x,2)
+    D = size(x,1)÷χ
+    
+    Tx = reshape(x,(χ,D,χ))
+    FL = rand(ComplexF64,(χ,χ)) |> x -> (x+x')/norm(x)
+    FL = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,Tx,conj(Tx)),
+    FL, 1, :LM; 
+    ishermitian = false)[2][1]
+    U,S,V= svd(FL)
 
-    # good retract!
-    AL, _, _ = leftorth(reshape(x, (χ,d,χ,1,1)))
-    x .= reshape(AL, (χ,d,χ))
+    g /= U*Diagonal(S)*U'+Matrix(I,χ,χ)*norm(g)
+    return g
+end
+
+function transport!(Z, W, G, α, W′)
+    U, S, V = svd(G)
+    WVd = W*V'
+    UdΘ = adjoint(U)*Z
+    sSUdθ, cSUdθ = Diagonal(sin.(α.*S))*UdΘ, Diagonal(cos.(α.*S))*UdΘ # sin(S)*U'*Θ, cos(S)*U'*Θ
+    cSm1UdΘ = axpy!(-1, UdΘ, cSUdθ) # (cos(S)-1)*U'*Θ
+    Z′ = axpy!(true, U*cSm1UdΘ - WVd*sSUdθ, Z)
+    Z′ = projectcomplement!(Z′, W′)
+    return Z′
 end

@@ -2,6 +2,7 @@ using LinearAlgebra
 using KrylovKit
 using OMEinsum
 using IterTools
+
 """
 tensor order graph: from left to right, top to bottom.
 ```
@@ -17,7 +18,7 @@ a ────┬──── c
 │     f     │
 ├─ g ─┼─ h ─┤           
 │     i     │
-j ────┴──── k     
+j ────┴──── k
 ```
 """
 
@@ -35,7 +36,7 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ```
 """
 function leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
-    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
     if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
         @show λs
         if real(λs[1]) > 0
@@ -81,7 +82,7 @@ FL  │  =  λL FL                 │
 ```
 """
 function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Ad,1))); kwargs...)
-    λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,Au,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Au),Ad), FL, 1, :LM; ishermitian = false, kwargs...)
     if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
         @show λs
         if real(λs[1]) > 0
@@ -126,8 +127,8 @@ FL4 │    = λL FL4     │     f     │
 ┕── Ad─       ┕──     j ────┴──── k          
 ```
 """
-function bigleftenv(Au, Ad, Mu, Md, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Mu,1), size(Md,1), size(Ad,1))); kwargs...)
-    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,Mu,Md,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
+function bigleftenv(Au, Ad, M, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
+    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
     # @show λFL4s
     return λFL4s[1], FL4s[1]
 end
@@ -146,8 +147,8 @@ of `AR - M - conj(AR)`` contracted along the physical dimension.
  ─ AR──┘         ──┘    j ────┴──── k
 ```
 """
-function bigrightenv(Au, Ad, Mu, Md, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Mu,3), size(Md,3), size(Ad,1))); kwargs...)
-    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,Mu,Md,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
+function bigrightenv(Au, Ad, M, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,1), size(Ad,1))); kwargs...)
+    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
     # @show λFR4s
     return λFR4s[1], FR4s[1]
 end
