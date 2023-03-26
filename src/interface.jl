@@ -58,7 +58,7 @@ function compress_fidelity(Au, Ad, M)
     _, FL4ud = bigleftenv( Au, Au, M)
     _, FR4ud = bigrightenv(Au, Au, M)
 
-    nu = ein"((((adgj,abc),dfeb),gihf),jik),cehk -> "(FL4ud,conj(Au),M,M,Au,FR4ud)[]/ein"abcd,abcd ->"(FL4ud,FR4ud)[]
+    nu = ein"((((adgj,abc),dbef),gihf),jik),cehk -> "(FL4ud,conj(Au),M,M,Au,FR4ud)[]/ein"abcd,abcd ->"(FL4ud,FR4ud)[]
 
     _, FLud = leftenv(Au, Ad, M)
     _, FRud = rightenv(Au, Ad, M)

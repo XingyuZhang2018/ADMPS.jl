@@ -1,4 +1,4 @@
-using ADMPS, Random, LinearAlgebra, Zygote, OMEinsum, ChainRulesCore
+using ADMPS, Random, LinearAlgebra, Zygote, OMEinsum, ChainRulesCore, Test
 atype = Array
 dtype = ComplexF64
 
