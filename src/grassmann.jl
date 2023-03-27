@@ -1,11 +1,7 @@
 using LinearAlgebra, OMEinsum
 export projectisometric!, projectcomplement!, retract, transport!, precondition
 
-function projectcomplement!(g, x)
-    P = adjoint(x)*g
-    g = mul!(g,x,P,-1.0,true)
-    return g
-end 
+projectcomplement!(g, x) = mul!(g,x,adjoint(x)*g,-1.0,true)
 
 function projectisometric!(x)
     U, S, V = svd(x,full=false)
@@ -14,22 +10,21 @@ end
 
 function retract(W, G, α)
     U, S, V = svd(G)
-    WVd = W*V'
-    cSV, sSV = Diagonal(cos.(α.*S))*V, Diagonal(sin.(α.*S)) * V'  # sin(S)*V, cos(S)*V'
-    W′ = projectisometric!(WVd*cSV + U*sSV)
-    sSSV = lmul!(Diagonal(S), sSV)
-    cSSV = lmul!(Diagonal(S), cSV)
-    Z′ = projectcomplement!(U*cSSV - WVd*sSSV, W′)
+    WV = W*V
+    cSVd, sSVd = Diagonal(cos.(α.*S))*V', Diagonal(sin.(α.*S)) * V'  # sin(S)*V, cos(S)*V'
+    W′ = projectisometric!(WV*cSVd + U*sSVd)
+    sSSVd = lmul!(Diagonal(S), sSVd)
+    cSSVd = lmul!(Diagonal(S), cSVd)
+    Z′ = projectcomplement!(U*cSSVd - WV*sSSVd, W′)
     return W′, Z′
 end
 
-function precondition(x,g)
+function precondition(x,g; FL = Matrix{ComplexF64}(I,size(x,2),size(x,2)))
     χ = size(x,2)
     D = size(x,1)÷χ
-    
     Tx = reshape(x,(χ,D,χ))
-    FL = rand(ComplexF64,(χ,χ)) |> x -> (x+x')/norm(x)
-    FL = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,Tx,conj(Tx)),
+    
+    FL = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Tx),Tx),
     FL, 1, :LM; 
     ishermitian = false)[2][1]
     U,S,V= svd(FL)
@@ -38,13 +33,24 @@ function precondition(x,g)
     return g
 end
 
+"""
+    Not checked
+"""
 function transport!(Z, W, G, α, W′)
     U, S, V = svd(G)
     WVd = W*V'
     UdΘ = adjoint(U)*Z
-    sSUdθ, cSUdθ = Diagonal(sin.(α.*S))*UdΘ, Diagonal(cos.(α.*S))*UdΘ # sin(S)*U'*Θ, cos(S)*U'*Θ
+    sSUdθ, cSUdθ = Diagonal(sin.(α.*S))*UdΘ, Diagonal(cos.(α.*S))*UdΘ 
     cSm1UdΘ = axpy!(-1, UdΘ, cSUdθ) # (cos(S)-1)*U'*Θ
     Z′ = axpy!(true, U*cSm1UdΘ - WVd*sSUdθ, Z)
     Z′ = projectcomplement!(Z′, W′)
     return Z′
 end
+
+# Tools functions for OptimKit.jl
+
+# Maybe weird for you, but just see OptimKit/linesearch.254
+_inner(x, ξ1, ξ2) = real(dot(precondition(x,ξ1),precondition(x,ξ2))) 
+
+_add!(η, ξ, β) = LinearAlgebra.axpy!(β, ξ, η)
+_scale!(η, β) = LinearAlgebra.rmul!(η, β)

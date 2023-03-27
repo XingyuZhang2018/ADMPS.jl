@@ -2,15 +2,16 @@ using ADMPS, Random, LinearAlgebra, Zygote, OMEinsum, ChainRulesCore, Test
 atype = Array
 dtype = ComplexF64
 
-using ADMPS: logoverlap, projectcomplement!
-@testset "gradient with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
+using ADMPS: factory_logoverlap, projectcomplement!
+@testset "gradient with $atype" for atype in [Array]
     Random.seed!(101)
     D,χ = 2,5
 
     M = rand(2,2,2,2)
-    Au = Matrix(qr(rand(dtype,χ*D,χ)).Q)
-    Ad = Matrix(qr(rand(dtype,χ*D,χ)).Q)
+    Au = Matrix(qr(rand(ComplexF64,χ*D,χ)).Q)
+    Ad = Matrix(qr(rand(ComplexF64,χ*D,χ)).Q)
 
+    logoverlap = factory_logoverlap(χ,D,atype)
     gradzygote = Zygote.gradient(x->logoverlap(Au, x, M)[1],Ad)[1]
     gradexact = logoverlap(Au, Ad, M)[2]
 
@@ -27,14 +28,15 @@ end
 
 using ADMPS:retract
 using ADMPS:precondition
-@testset "Line Search with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
+@testset "Line Search with $atype" for atype in [Array]
     Random.seed!(101)
     D,χ = 2,5
 
     M = rand(2,2,2,2)
-    Au = Matrix(qr(rand(dtype,χ*D,χ)).Q)
-    Ad = Matrix(qr(rand(dtype,χ*D,χ)).Q)
+    Au = Matrix(qr(rand(ComplexF64,χ*D,χ)).Q)
+    Ad = Matrix(qr(rand(ComplexF64,χ*D,χ)).Q)
 
+    logoverlap = factory_logoverlap(χ,D,atype)
     f,g = Ad->logoverlap(Au, Ad, M)[1], Ad->logoverlap(Au, Ad, M)[2]
 
     for α in [0.001,0.01]

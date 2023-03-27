@@ -3,9 +3,9 @@ using ADMPS, Random, LinearAlgebra, Test
 atype = Array
 dtype = ComplexF64
 
-@testset "Solve Dimer Covering with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
+@testset "Solve AFM-Triangular Ising model with $atype" for atype in [Array]
     Random.seed!(101)
-    D,χ = 2,32
+    D,χ = 2,16
 
     M = zeros(ComplexF64,(2,2,2,2))
     M[2,1,1,1]=1.0

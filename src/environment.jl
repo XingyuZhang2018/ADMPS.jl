@@ -1,3 +1,5 @@
+# Low level functions for computing the environment tensors
+
 using LinearAlgebra
 using KrylovKit
 using OMEinsum
@@ -23,7 +25,7 @@ j ────┴──── k
 """
 
 """
-    λ, FL = leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Au,1))); kwargs...)
+    λ, FML = leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Au,1))); kwargs...)
 
 Compute the left environment tensor for MPS `AL` and MPO `M`, by finding the left fixed point
 of `Au - M - Ad` contracted Aung the physical dimension.
@@ -35,8 +37,8 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ┕──  Ad─       ┕──       f ────┴──── h 
 ```
 """
-function leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
-    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
+    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad), FML, 1, :LM; ishermitian = false, kwargs...)
     if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
         @show λs
         if real(λs[1]) > 0
@@ -45,7 +47,7 @@ function leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), siz
             return λs[2], FLs[2]
         end
     end
-    return λs[1], FLs[1]
+    return λs[1], copyto!(FML, FLs[1])
 end
 
 """
@@ -61,11 +63,11 @@ of `Au - M - Ad` contracted Aung the physical dimension.
  ─ Ad ──┘         ──┘      f ────┴──── h 
 ```
 """
-function rightenv(Au, Ad, M, FR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
+function rightenv(Au, Ad, M, FMR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
     Au = permutedims(Au,(3,2,1))
     Ad = permutedims(Ad,(3,2,1))
     ML = permutedims(M,(3,2,1,4))
-    return leftenv(Au, Ad, ML, FR; kwargs...)
+    return leftenv(Au, Ad, ML, FMR; kwargs...)
 end
 
 """
@@ -91,7 +93,7 @@ function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(A
             return λs[2], FLs[2]
         end
     end
-    return λs[1], FLs[1]
+    return λs[1], copyto!(FL, FLs[1])
 end
 
 """
@@ -127,10 +129,10 @@ FL4 │    = λL FL4     │     f     │
 ┕── Ad─       ┕──     j ────┴──── k          
 ```
 """
-function bigleftenv(Au, Ad, M, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
-    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
+function bigleftenv(Au, Ad, M, FMML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
+    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FMML, 1, :LM; ishermitian = false, kwargs...)
     # @show λFL4s
-    return λFL4s[1], FL4s[1]
+    return λFL4s[1], copyto!(FMML, FL4s[1])
 end
 
 """
@@ -147,8 +149,8 @@ of `AR - M - conj(AR)`` contracted along the physical dimension.
  ─ AR──┘         ──┘    j ────┴──── k
 ```
 """
-function bigrightenv(Au, Ad, M, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,1), size(Ad,1))); kwargs...)
-    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
+function bigrightenv(Au, Ad, M, FMMR = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,1), size(Ad,1))); kwargs...)
+    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FMMR, 1, :LM; ishermitian = false, kwargs...)
     # @show λFR4s
-    return λFR4s[1], FR4s[1]
+    return λFR4s[1], copyto!(FMMR, FR4s[1])
 end
