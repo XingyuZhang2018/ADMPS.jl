@@ -18,10 +18,10 @@
 """
 function optimizemps(Au, Ad, M; 
     gradtol::Real = 1e-6, 
-    opiter::Int = 20, 
+    opiter::Int = 10, 
     verbosity = 2,
     alg = LBFGS(20; maxiter=opiter, gradtol=gradtol, verbosity=2),
-    poweriter = 100, ptol = 1E-11)
+    poweriter = 1000, ptol = 1E-11)
 
     # Fix array size
     χ,D = size(Au,2), size(M,2)
@@ -42,6 +42,7 @@ function optimizemps(Au, Ad, M;
 
 
     for i in 1:poweriter
+        
         # Print information about power steps
         if verbosity > 0
             message = "\npower iter: $i   \n"
@@ -63,14 +64,14 @@ function optimizemps(Au, Ad, M;
         end
 
         # Print Log(Z)
-        if verbosity > 0
+        if verbosity > -1
             message = "log(Z)= $(-logoverlap(Au, Ad, Md)[1]) \n"
             printstyled(message; bold=true, color=:red)
             flush(stdout)
         end
 
         # Print information about up down vector overlap
-        if verbosity > 1
+        if verbosity > -1
             message = "AuAd overlap = $(abs(norm_FL(reshape(Au,(χ,D,χ)), reshape(Ad,(χ,D,χ)),env["FL"])[1])) \n"
             printstyled(message; bold=true, color=:red)
             flush(stdout)

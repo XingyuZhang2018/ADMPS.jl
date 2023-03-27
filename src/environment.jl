@@ -4,6 +4,7 @@ using LinearAlgebra
 using KrylovKit
 using OMEinsum
 using IterTools
+using ChainRulesCore
 
 """
 tensor order graph: from left to right, top to bottom.
@@ -38,6 +39,8 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ```
 """
 function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
+    refresh_cache!(FML)
+    
     λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad), FML, 1, :LM; ishermitian = false, kwargs...)
     if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
         @show λs
@@ -84,6 +87,8 @@ FL  │  =  λL FL                 │
 ```
 """
 function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Ad,1))); kwargs...)
+    refresh_cache!(FL)
+
     λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Au),Ad), FL, 1, :LM; ishermitian = false, kwargs...)
     if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
         @show λs
@@ -130,6 +135,8 @@ FL4 │    = λL FL4     │     f     │
 ```
 """
 function bigleftenv(Au, Ad, M, FMML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
+    refresh_cache!(FMML)
+
     λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FMML, 1, :LM; ishermitian = false, kwargs...)
     # @show λFL4s
     return λFL4s[1], copyto!(FMML, FL4s[1])
@@ -150,6 +157,8 @@ of `AR - M - conj(AR)`` contracted along the physical dimension.
 ```
 """
 function bigrightenv(Au, Ad, M, FMMR = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,1), size(Ad,1))); kwargs...)
+    refresh_cache!(FMMR)
+
     λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FMMR, 1, :LM; ishermitian = false, kwargs...)
     # @show λFR4s
     return λFR4s[1], copyto!(FMMR, FR4s[1])

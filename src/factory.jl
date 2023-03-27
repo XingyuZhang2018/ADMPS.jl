@@ -99,7 +99,7 @@ function factory_onestep(χ::Int, D::Int, ArrayType; cached_env::Dict =create_ca
             )
         Td, fx, gx, numfg, normgradhistory = res
 
-        if verbosity > 0
+        if verbosity > 1
             message = "compress fidelity   = $(compress_fidelity(Tu, Td, M))\npower convergence = $(abs(norm_FL(reshape(Tu,(χ,D,χ)), reshape(Td,(χ,D,χ)),FL)[1])) \n"
             printstyled(message; bold=true, color=:green)
             flush(stdout)
