@@ -2,6 +2,7 @@ import Optim: project_tangent, project_tangent!, retract!, Manifold
 
 struct Grassmann <: Manifold
 end
+export Grassmann
 
 """
     Project a vector g onto a Grassmann (ij)(k) manifold at point x

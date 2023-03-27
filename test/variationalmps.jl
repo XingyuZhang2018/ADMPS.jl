@@ -44,12 +44,12 @@ end
     @test Ad !== nothing
 end
 
-@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64], manifold in [Grassmann()]
+@testset "oneside optimize mps" for atype in [Array], dtype in [ComplexF64], manifold in [Flat(), Grassmann()]
     seed_number = 100
     β = 0.8
     D,χ = 2,20
     mapsteps = 20
-    infolder, outfolder = "./data/", "./data/"
+    infolder, outfolder = "./data/$manifold", "./data/$manifold"
 
     model = Ising(β)
     M = atype{dtype}(model_tensor(model))
