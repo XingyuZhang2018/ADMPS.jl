@@ -4,7 +4,7 @@ const CACHE_RATE = 0.0
 # only cache parts of previous result to speed up. Introduce some perturbation to avoid always converge to the same. 
 function refresh_cache!(v)
     v .= CACHE_RATE * v / sum(abs,v) * length(v)
-    return axpy!(1-CACHE_RATE, randn(eltype(v), size(v)),v)
+    return axpy!(1-CACHE_RATE, _arraytype(v)(randn(eltype(v), size(v))),v)
 end
 
 """

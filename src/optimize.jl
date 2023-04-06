@@ -31,15 +31,17 @@ function optimizemps(Au, Ad, M;
     Md = permutedims(M,(1,4,3,2))
 
     # create cached environment for up dn measurement
+    env_up = create_cached_one(χ,D,ArrayType)
     env = create_cached_one(χ,D,ArrayType)
 
     # create onestep function from factory
-    onestep_up = factory_onestep(χ,D, ArrayType; alg=alg, verbosity=verbosity)
-    onestep_dn = factory_onestep(χ,D, ArrayType; alg=alg, verbosity=verbosity)
+    onestep = factory_onestep(χ,D, ArrayType; alg=alg, verbosity=verbosity, cached_env=env_up)
 
     # functions used after power
     logoverlap = factory_logoverlap(χ,D,ArrayType,env)
 
+    # functions for calculating eigenvalue
+    overlap = factory_overlap(χ,D,ArrayType,env_up)
 
     for i in 1:poweriter
         
@@ -50,8 +52,10 @@ function optimizemps(Au, Ad, M;
             flush(stdout)
         end
 
-        new_Au = onestep_up(M , Au, Au)
-        new_Ad = onestep_dn(Md, Ad, Ad)
+        new_Au = onestep(M, Au, Au)
+        eigenvalue = overlap(Au,Au,M)
+
+        new_Ad = solveAx0(Md, Ad, eigenvalue, ArrayType; ftol=1E-10, verbosity=2)
         
         # If power method is converged, stop.
         dn_convergence =  (abs(norm_FL(reshape(new_Ad,(χ,D,χ)), reshape(Ad,(χ,D,χ)),env["FL"])[1]))
@@ -65,7 +69,9 @@ function optimizemps(Au, Ad, M;
 
         # Print Log(Z)
         if verbosity > -1
-            message = "log(Z)= $(-logoverlap(Au, Ad, Md)[1]) \n"
+            logZ = -logoverlap(Au, Ad, Md)[1]
+            norm_factor = log(abs(norm_FL(reshape(Au,(χ,D,χ)), reshape(Ad,(χ,D,χ)),env["FL"])[1]))
+            message = "log(Z)= $(logZ-norm_factor) \n"
             printstyled(message; bold=true, color=:red)
             flush(stdout)
         end

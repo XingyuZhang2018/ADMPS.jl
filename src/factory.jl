@@ -1,5 +1,38 @@
 # Factory to produce cache-binded functions
 
+
+function factory_overlap(χ::Int,D::Int,ArrayType=Array, cached_env=create_cached_one(χ,D,ArrayType))
+    FML = cached_env["FML"]
+    FMR = cached_env["FMR"]
+
+    """
+        overlap(Au, Ad, M)
+    ````
+        ┌── Au──┐     a ────┬──── c
+        │   │   │     │     b     │
+        FL─ M ──FR    ├─ d ─┼─ e ─┤
+        │   │   │     │     g     │   
+        └── Ad──┘     f ────┴──── h 
+    ````
+    return value and gradient to Ad
+    """
+    function overlap(Au, Ad, M)
+        Au = reshape(Au,(χ,D,χ))
+        Ad = reshape(Ad,(χ,D,χ))
+        
+        # No need to compute the gradient of the environment tensors, due to Feynmann Hellmann theorem
+        _, FLud = ChainRulesCore.@ignore_derivatives leftenv(Au, Ad, M, FML)
+        _, FRud = ChainRulesCore.@ignore_derivatives rightenv(Au, Ad, M, FMR)
+
+        G = ein"((adf,abc),dgeb),ceh -> fgh"(FLud,conj(Au),M,FRud)/ein"abc,abc -> "(FLud,FRud)[]
+        contract_value = ein"ijk,ijk->"(G,Ad)[]
+        return contract_value
+    end
+
+    return overlap
+end
+
+
 function factory_logoverlap(χ::Int,D::Int,ArrayType=Array, cached_env=create_cached_one(χ,D,ArrayType))
     FML = cached_env["FML"]
     FMR = cached_env["FMR"]
@@ -86,8 +119,6 @@ function factory_onestep(χ::Int, D::Int, ArrayType; cached_env::Dict =create_ca
     function onestep(M, Tu, Td)
 
         fg(Td) = logoverlap(Tu, Td, M;) # produced from factory with caches
-        print_header(verbosity)
-
         res = optimize(fg, 
             Td, alg;
             retract = retract,

@@ -31,6 +31,7 @@ dtype = ComplexF64
 
     Au = random_mps(χ,D)
     Ad = random_mps(χ,D)
+    # Ad = Array(qr(Au+0.1*Ad).Q)
 
-    Au, Ad = optimizemps(Au, Ad, M,verbosity=0)
+    Au, Ad = optimizemps(Au, Ad, M,verbosity=2)
 end
