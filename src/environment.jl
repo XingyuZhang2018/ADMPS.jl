@@ -6,6 +6,13 @@ using OMEinsum
 using IterTools
 using ChainRulesCore
 
+function LMmap(Au,Ad,M,λ=0.0)
+    function f(FL)
+        FL = ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad) + λ * FL
+        return FL
+    end
+end
+
 """
 tensor order graph: from left to right, top to bottom.
 ```
@@ -38,18 +45,17 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ┕──  Ad─       ┕──       f ────┴──── h 
 ```
 """
-function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
+function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))),λ=0.0; kwargs...)
     refresh_cache!(FML)
-    
-    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad), FML, 1, :LM; ishermitian = false, kwargs...)
-    if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
-        @show λs
-        if real(λs[1]) > 0
-            return λs[1], FLs[1]
-        else
-            return λs[2], FLs[2]
-        end
-    end
+    λs, FLs, info = eigsolve(LMmap(Au,Ad,M,λ), FML, 1, :LM; ishermitian = false, kwargs...)
+    @show λs
+    # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
+    #     if real(λs[1]) > 0
+    #         return λs[1], FLs[1]
+    #     else
+    #         return λs[2], FLs[2]
+    #     end
+    # end
     return λs[1], copyto!(FML, FLs[1])
 end
 
@@ -66,11 +72,11 @@ of `Au - M - Ad` contracted Aung the physical dimension.
  ─ Ad ──┘         ──┘      f ────┴──── h 
 ```
 """
-function rightenv(Au, Ad, M, FMR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
+function rightenv(Au, Ad, M, FMR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))),λ=0.0 ; kwargs...)
     Au = permutedims(Au,(3,2,1))
     Ad = permutedims(Ad,(3,2,1))
     ML = permutedims(M,(3,2,1,4))
-    return leftenv(Au, Ad, ML, FMR; kwargs...)
+    return leftenv(Au, Ad, ML, FMR,λ; kwargs...)
 end
 
 """
@@ -90,14 +96,14 @@ function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(A
     refresh_cache!(FL)
 
     λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Au),Ad), FL, 1, :LM; ishermitian = false, kwargs...)
-    if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
-        @show λs
-        if real(λs[1]) > 0
-            return λs[1], FLs[1]
-        else
-            return λs[2], FLs[2]
-        end
-    end
+    # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
+    #     @show λs
+    #     if real(λs[1]) > 0
+    #         return λs[1], FLs[1]
+    #     else
+    #         return λs[2], FLs[2]
+    #     end
+    # end
     return λs[1], copyto!(FL, FLs[1])
 end
 

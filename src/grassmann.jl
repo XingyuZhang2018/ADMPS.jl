@@ -38,11 +38,11 @@ end
 """
 function transport!(Z, W, G, α, W′)
     U, S, V = svd(G)
-    WVd = W*V'
+    WV = W*V
     UdΘ = adjoint(U)*Z
     sSUdθ, cSUdθ = Diagonal(sin.(α.*S))*UdΘ, Diagonal(cos.(α.*S))*UdΘ 
     cSm1UdΘ = axpy!(-1, UdΘ, cSUdθ) # (cos(S)-1)*U'*Θ
-    Z′ = axpy!(true, U*cSm1UdΘ - WVd*sSUdθ, Z)
+    Z′ = axpy!(true, U*cSm1UdΘ - WV*sSUdθ, Z)
     Z′ = projectcomplement!(Z′, W′)
     return Z′
 end

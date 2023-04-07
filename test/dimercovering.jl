@@ -21,6 +21,7 @@ dtype = ComplexF64
 
 @testset "Solve Dimer Covering with $atype (abandon Up-Dn symmetry)" for atype in [Array]
     Random.seed!(101)
+    # Random.seed!(102)
     D,χ = 2,16
 
     M = zeros(ComplexF64,(2,2,2,2))
@@ -32,5 +33,5 @@ dtype = ComplexF64
     Au = random_mps(χ,D)
     Ad = random_mps(χ,D)
 
-    Au, Ad = optimizemps(Au, Ad, M,verbosity=0)
+    Au, Ad = optimizemps(Au, Ad, M,verbosity=2)
 end

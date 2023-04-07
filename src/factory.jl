@@ -1,6 +1,6 @@
 # Factory to produce cache-binded functions
 
-function factory_logoverlap(χ::Int,D::Int,ArrayType=Array, cached_env=create_cached_one(χ,D,ArrayType))
+function factory_logoverlap(χ::Int,D::Int,ArrayType=Array, cached_env=create_cached_one(χ,D,ArrayType), λ=0.0)
     FML = cached_env["FML"]
     FMR = cached_env["FMR"]
 
@@ -20,13 +20,13 @@ function factory_logoverlap(χ::Int,D::Int,ArrayType=Array, cached_env=create_ca
         Ad = reshape(Ad,(χ,D,χ))
         
         # No need to compute the gradient of the environment tensors, due to Feynmann Hellmann theorem
-        _, FLud = ChainRulesCore.@ignore_derivatives leftenv(Au, Ad, M, FML)
-        _, FRud = ChainRulesCore.@ignore_derivatives rightenv(Au, Ad, M, FMR)
+        _, FLud = ChainRulesCore.@ignore_derivatives leftenv(Au, Ad, M, FML, λ)
+        _, FRud = ChainRulesCore.@ignore_derivatives rightenv(Au, Ad, M, FMR, λ)
 
         G = ein"((adf,abc),dgeb),ceh -> fgh"(FLud,conj(Au),M,FRud)/ein"abc,abc -> "(FLud,FRud)[]
         contract_value = ein"ijk,ijk->"(G,Ad)[]
 
-        value, gradient = -log(abs(contract_value)), conj(-1/contract_value*G)
+        value, gradient = -log(abs(contract_value)), -conj(1/contract_value*G)
         return value, ChainRulesCore.@ignore_derivatives projectcomplement!(reshape(gradient,(χ*D,χ)),reshape(Ad,(χ*D,χ)))
     end
 
@@ -74,7 +74,8 @@ end
 function factory_onestep(χ::Int, D::Int, ArrayType; cached_env::Dict =create_cached_one(χ,D,ArrayType),
     verbosity::Int = 2,
     alg = LBFGS(20; maxiter=10, gradtol=1e-10, verbosity=verbosity),
-    logoverlap::Function = factory_logoverlap(χ,D,ArrayType, cached_env),
+    shift = 1.0,
+    logoverlap::Function = factory_logoverlap(χ,D,ArrayType, cached_env, shift),
     compress_fidelity::Function = factory_compress_fidelity(χ,D,ArrayType,cached_env)
     )
     FL = cached_env["FL"]
@@ -85,7 +86,7 @@ function factory_onestep(χ::Int, D::Int, ArrayType; cached_env::Dict =create_ca
     """
     function onestep(M, Tu, Td)
 
-        fg(Td) = logoverlap(Tu, Td, M;) # produced from factory with caches
+        fg(Td) = logoverlap(Tu, Td, M) # produced from factory with caches
         print_header(verbosity)
 
         res = optimize(fg, 
