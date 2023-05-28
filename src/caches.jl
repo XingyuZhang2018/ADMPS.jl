@@ -1,11 +1,24 @@
 # Create caches spaces
 
-const CACHE_RATE = 0.0
 # only cache parts of previous result to speed up. Introduce some perturbation to avoid always converge to the same. 
-function refresh_cache!(v)
-    v .= CACHE_RATE * v / sum(abs,v) * length(v)
-    return axpy!(1-CACHE_RATE, randn(eltype(v), size(v)),v)
+# Experimental, with limited tests, this cache does not fail for 1.0.
+
+if CACHE_RATE < 1.0
+    @info "ADMPS CACHE: Cache rate is less than 1.0, cache will be used."
+    function refresh_cache!(v)
+        v .= CACHE_RATE * v / sum(abs,v) * length(v)
+        return axpy!(1-CACHE_RATE, _arraytype(v)(ones(eltype(v), size(v))),v)
+    end    
+else
+    @info "Cache rate is 1.0, no refresh of cache."
+
+    """
+        CACHE_RATE=1.0, refresh_cache!(v) = v, does not refresh cache.
+    """
+    refresh_cache!(v) = v
 end
+
+
 
 """
     create CACHED environment; only one set: FL, FR....

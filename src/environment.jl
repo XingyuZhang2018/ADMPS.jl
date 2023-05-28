@@ -1,4 +1,5 @@
 # Low level functions for computing the environment tensors
+# Solid functions
 
 using LinearAlgebra
 using KrylovKit
@@ -12,6 +13,8 @@ function LMmap(Au,Ad,M,λ=0.0)
         return FL
     end
 end
+
+env_eigsolve(args...; kwargs...) = eigsolve(args...;maxiter=100,tol=1E-12,krylovdim=30,verbosity=0,kwargs...)
 
 """
 tensor order graph: from left to right, top to bottom.
@@ -47,8 +50,7 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 """
 function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))),λ=0.0; kwargs...)
     refresh_cache!(FML)
-    λs, FLs, info = eigsolve(LMmap(Au,Ad,M,λ), FML, 1, :LM; ishermitian = false, kwargs...)
-    @show λs
+    λs, FLs, info = env_eigsolve(LMmap(Au,Ad,M,λ), FML, 1, :LM; ishermitian = false, kwargs...)
     # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
     #     if real(λs[1]) > 0
     #         return λs[1], FLs[1]
@@ -56,6 +58,10 @@ function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), si
     #         return λs[2], FLs[2]
     #     end
     # end
+
+    # FML_update = 1-abs.(ein"ijk,ijk->"(conj(FML),FLs[1]).^2 ./ ein"ijk,ijk->"(conj(FLs[1]),FLs[1])./ein"ijk,ijk->"(conj(FML),FML))[]
+    # @show FML_update,abs.(λs)
+
     return λs[1], copyto!(FML, FLs[1])
 end
 
@@ -95,7 +101,7 @@ FL  │  =  λL FL                 │
 function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Ad,1))); kwargs...)
     refresh_cache!(FL)
 
-    λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Au),Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    λs, FLs, info = env_eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Au),Ad), FL, 1, :LM; ishermitian = false, kwargs...)
     # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
     #     @show λs
     #     if real(λs[1]) > 0
@@ -104,6 +110,10 @@ function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(A
     #         return λs[2], FLs[2]
     #     end
     # end
+
+    # FL_update = 1.0 - abs(ein"ij,ij->"(conj(FL),FLs[1]).^2 ./ ein"ij,ij->"(conj(FLs[1]),FLs[1])./ein"ij,ij->"(conj(FL),FL))
+    # @show FL_update,abs.(λs)
+
     return λs[1], copyto!(FL, FLs[1])
 end
 
@@ -143,8 +153,8 @@ FL4 │    = λL FL4     │     f     │
 function bigleftenv(Au, Ad, M, FMML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
     refresh_cache!(FMML)
 
-    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FMML, 1, :LM; ishermitian = false, kwargs...)
-    # @show λFL4s
+    λFL4s, FL4s, info = env_eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FMML, 1, :LM; ishermitian = false, kwargs...)
+
     return λFL4s[1], copyto!(FMML, FL4s[1])
 end
 
@@ -165,7 +175,7 @@ of `AR - M - conj(AR)`` contracted along the physical dimension.
 function bigrightenv(Au, Ad, M, FMMR = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,1), size(Ad,1))); kwargs...)
     refresh_cache!(FMMR)
 
-    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FMMR, 1, :LM; ishermitian = false, kwargs...)
-    # @show λFR4s
+    λFR4s, FR4s, info = env_eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FMMR, 1, :LM; ishermitian = false, kwargs...)
+
     return λFR4s[1], copyto!(FMMR, FR4s[1])
 end

@@ -19,7 +19,7 @@ function retract(W, G, α)
     return W′, Z′
 end
 
-function precondition(x,g; FL = Matrix{ComplexF64}(I,size(x,2),size(x,2)))
+function precondition(x,g; FL = _arraytype(g)(Matrix{ComplexF64}(I,size(x,2),size(x,2))), λ=1E-4)
     χ = size(x,2)
     D = size(x,1)÷χ
     Tx = reshape(x,(χ,D,χ))
@@ -29,7 +29,8 @@ function precondition(x,g; FL = Matrix{ComplexF64}(I,size(x,2),size(x,2)))
     ishermitian = false)[2][1]
     U,S,V= svd(FL)
 
-    g /= U*Diagonal(S)*U'+Matrix(I,χ,χ)*norm(g)
+    # General terms + normalization
+    g /= U*Diagonal(S)*U' + _arraytype(g)(Matrix(I,χ,χ)*(norm(g)+λ))
     return g
 end
 
@@ -50,7 +51,9 @@ end
 # Tools functions for OptimKit.jl
 
 # Maybe weird for you, but just see OptimKit/linesearch.254
-_inner(x, ξ1, ξ2) = real(dot(precondition(x,ξ1),precondition(x,ξ2))) 
+# This indicate whether the precondition is proper. So simply dot is ok
+_inner(x, ξ1, ξ2) = real(dot(ξ1,ξ2)) 
+
 
 _add!(η, ξ, β) = LinearAlgebra.axpy!(β, ξ, η)
 _scale!(η, β) = LinearAlgebra.rmul!(η, β)

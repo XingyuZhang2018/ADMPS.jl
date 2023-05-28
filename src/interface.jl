@@ -1,13 +1,13 @@
 using FileIO
 using OptimKit, LineSearches
 using LinearAlgebra: I, norm, tr
-using Zygote, ChainRulesCore
+using Zygote, ChainRulesCore,Random
 
 """
     Generate a random input function with χ,D and given types
 """
 function random_mps(χ,D;atype=Array,dtype=ComplexF64)
-    return atype(qr(rand(dtype,χ*D,χ)).Q)
+    return atype(Array(qr(rand(dtype,χ*D,χ)).Q))
 end
 
 
