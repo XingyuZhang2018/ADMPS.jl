@@ -9,14 +9,15 @@ else
     atype = Array
 end
 
-Random.seed!(105)
+Random.seed!(103)
 D,χ = 2,parse(Int,ARGS[1])
 
-M = ComplexF64.(randn(Float64,(2,2,2,2)))
+M = ComplexF64.(randn(ComplexF64,(2,2,2,2)))
 # M = rand(ComplexF64,(2,2,2,2))
 
 Au = random_mps(χ,D;atype=atype)
 Ad = random_mps(χ,D;atype=atype)
 
 
-Au, Ad = optimizemps(Au, Ad, atype(M),verbosity=-1,poweriter=2000,savefile="/data/yangqi/ADMPS/randn105/chi$(χ).h5")
+run(`mkdir -p /data/yangqi/ADMPS/randc103`)
+Au, Ad = optimizemps(Au, Ad, atype(M),verbosity=-1,poweriter=2000,savefile="/data/yangqi/ADMPS/randc103/chi$(χ).h5")

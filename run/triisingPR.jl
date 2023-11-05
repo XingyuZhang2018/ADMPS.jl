@@ -18,12 +18,12 @@ Au = random_mps(χ,D;atype=atype)
 Ad = random_mps(χ,D;atype=atype)
 
 M = zeros(ComplexF64,(2,2,2,2))
+M[2,2,1,1]=0.01
+M[1,1,1,1]=1.0
 M[2,1,1,1]=1.0
-M[1,2,1,1]=1.0
-M[2,2,1,1]=1.0
+M[1,1,2,2]=0.01
+M[2,2,2,2]=1.0
 M[1,2,2,2]=1.0
-M[2,1,2,2]=1.0
-M[1,1,2,2]=1.0
 M = M.+rand(2,2,2,2).*r
 
 run(`mkdir -p /data/yangqi/ADMPS/triisingPR`)
