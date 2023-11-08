@@ -1,21 +1,7 @@
-# Low level functions for computing the environment tensors
-# Solid functions
-
 using LinearAlgebra
 using KrylovKit
 using OMEinsum
 using IterTools
-using ChainRulesCore
-
-function LMmap(Au,Ad,M,λ=0.0)
-    function f(FL)
-        FL = ein"((adf,abc),dgeb),fgh -> ceh"(FL,conj(Au),M,Ad) + λ * FL
-        return FL
-    end
-end
-
-env_eigsolve(args...; kwargs...) = eigsolve(args...;maxiter=100,tol=1E-12,krylovdim=30,verbosity=0,kwargs...)
-
 """
 tensor order graph: from left to right, top to bottom.
 ```
@@ -31,12 +17,50 @@ a ────┬──── c
 │     f     │
 ├─ g ─┼─ h ─┤           
 │     i     │
-j ────┴──── k
+j ────┴──── k     
 ```
 """
 
+safesign(x::Number) = iszero(x) ? one(x) : sign(x)
+
 """
-    λ, FML = leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Au,1))); kwargs...)
+    qrpos(A)
+
+Returns a QR decomposition, i.e. an isometric `Q` and upper triangular `R` matrix, where `R`
+is guaranteed to have positive diagonal elements.
+"""
+qrpos(A) = qrpos!(copy(A))
+function qrpos!(A)
+    mattype = _mattype(A)
+    F = qr!(mattype(A))
+    Q = mattype(F.Q)
+    R = F.R
+    phases = safesign.(diag(R))
+    rmul!(Q, Diagonal(phases))
+    lmul!(Diagonal(conj!(phases)), R)
+    return Q, R
+end
+
+"""
+    lqpos(A)
+
+Returns a LQ decomposition, i.e. a lower triangular `L` and isometric `Q` matrix, where `L`
+is guaranteed to have positive diagonal elements.
+"""
+lqpos(A) = lqpos!(copy(A))
+function lqpos!(A)
+    mattype = _mattype(A)
+    F = qr!(mattype(A'))
+    Q = mattype(mattype(F.Q)')
+    L = mattype(F.R')
+    phases = safesign.(diag(L))
+    lmul!(Diagonal(phases), Q)
+    rmul!(L, Diagonal(conj!(phases)))
+    return L, Q
+end
+
+"""
+    λ, FL = leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Au,1))); kwargs...)
 
 Compute the left environment tensor for MPS `AL` and MPO `M`, by finding the left fixed point
 of `Au - M - Ad` contracted Aung the physical dimension.
@@ -48,21 +72,17 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ┕──  Ad─       ┕──       f ────┴──── h 
 ```
 """
-function leftenv(Au, Ad, M, FML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))),λ=0.0; kwargs...)
-    refresh_cache!(FML)
-    λs, FLs, info = env_eigsolve(LMmap(Au,Ad,M,λ), FML, 1, :LM; ishermitian = false, kwargs...)
-    # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
-    #     if real(λs[1]) > 0
-    #         return λs[1], FLs[1]
-    #     else
-    #         return λs[2], FLs[2]
-    #     end
-    # end
-
-    # FML_update = 1-abs.(ein"ijk,ijk->"(conj(FML),FLs[1]).^2 ./ ein"ijk,ijk->"(conj(FLs[1]),FLs[1])./ein"ijk,ijk->"(conj(FML),FML))[]
-    # @show FML_update,abs.(λs)
-
-    return λs[1], copyto!(FML, FLs[1])
+function leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
+    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
+        @show λs
+        if real(λs[1]) > 0
+            return λs[1], FLs[1]
+        else
+            return λs[2], FLs[2]
+        end
+    end
+    return λs[1], FLs[1]
 end
 
 """
@@ -78,11 +98,11 @@ of `Au - M - Ad` contracted Aung the physical dimension.
  ─ Ad ──┘         ──┘      f ────┴──── h 
 ```
 """
-function rightenv(Au, Ad, M, FMR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))),λ=0.0 ; kwargs...)
+function rightenv(Au, Ad, M, FR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
     Au = permutedims(Au,(3,2,1))
     Ad = permutedims(Ad,(3,2,1))
     ML = permutedims(M,(3,2,1,4))
-    return leftenv(Au, Ad, ML, FMR,λ; kwargs...)
+    return leftenv(Au, Ad, ML, FR; kwargs...)
 end
 
 """
@@ -99,22 +119,16 @@ FL  │  =  λL FL                 │
 ```
 """
 function norm_FL(Au, Ad, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Ad,1))); kwargs...)
-    refresh_cache!(FL)
-
-    λs, FLs, info = env_eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,conj(Au),Ad), FL, 1, :LM; ishermitian = false, kwargs...)
-    # if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
-    #     @show λs
-    #     if real(λs[1]) > 0
-    #         return λs[1], FLs[1]
-    #     else
-    #         return λs[2], FLs[2]
-    #     end
-    # end
-
-    # FL_update = 1.0 - abs(ein"ij,ij->"(conj(FL),FLs[1]).^2 ./ ein"ij,ij->"(conj(FLs[1]),FLs[1])./ein"ij,ij->"(conj(FL),FL))
-    # @show FL_update,abs.(λs)
-
-    return λs[1], copyto!(FL, FLs[1])
+    λs, FLs, info = eigsolve(FL -> ein"(ad,acb),dce -> be"(FL,Au,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
+        @show λs
+        if real(λs[1]) > 0
+            return λs[1], FLs[1]
+        else
+            return λs[2], FLs[2]
+        end
+    end
+    return λs[1], FLs[1]
 end
 
 """
@@ -150,12 +164,10 @@ FL4 │    = λL FL4     │     f     │
 ┕── Ad─       ┕──     j ────┴──── k          
 ```
 """
-function bigleftenv(Au, Ad, M, FMML = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(M,1), size(Ad,1))); kwargs...)
-    refresh_cache!(FMML)
-
-    λFL4s, FL4s, info = env_eigsolve(FL4 -> ein"(((adgj,abc),dbef),gihf),jik -> cehk"(FL4,conj(Au),conj(M),M,Ad), FMML, 1, :LM; ishermitian = false, kwargs...)
-
-    return λFL4s[1], copyto!(FMML, FL4s[1])
+function bigleftenv(Au, Ad, Mu, Md, FL4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Mu,1), size(Md,1), size(Ad,1))); kwargs...)
+    λFL4s, FL4s, info = eigsolve(FL4 -> ein"(((adgj,abc),dfeb),gihf),jik -> cehk"(FL4,Au,Mu,Md,Ad), FL4, 1, :LM; ishermitian = false, kwargs...)
+    # @show λFL4s
+    return λFL4s[1], FL4s[1]
 end
 
 """
@@ -172,10 +184,8 @@ of `AR - M - conj(AR)`` contracted along the physical dimension.
  ─ AR──┘         ──┘    j ────┴──── k
 ```
 """
-function bigrightenv(Au, Ad, M, FMMR = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(M,1), size(Ad,1))); kwargs...)
-    refresh_cache!(FMMR)
-
-    λFR4s, FR4s, info = env_eigsolve(FR4 -> ein"(((cehk,abc),dbef),gihf),jik -> adgj"(FR4,conj(Au),conj(M),M,Ad), FMMR, 1, :LM; ishermitian = false, kwargs...)
-
-    return λFR4s[1], copyto!(FMMR, FR4s[1])
+function bigrightenv(Au, Ad, Mu, Md, FR4 = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(Mu,3), size(Md,3), size(Ad,1))); kwargs...)
+    λFR4s, FR4s, info = eigsolve(FR4 -> ein"(((cehk,abc),dfeb),gihf),jik -> adgj"(FR4,Au,Mu,Md,Ad), FR4, 1, :LM; ishermitian = false, kwargs...)
+    # @show λFR4s
+    return λFR4s[1], FR4s[1]
 end

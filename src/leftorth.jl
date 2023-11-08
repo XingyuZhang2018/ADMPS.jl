@@ -1,6 +1,7 @@
 # Only for test
 
 using LinearAlgebra, TensorOperations, KrylovKit
+export leftorth, rightorth
 
 safesign(x::Number) = iszero(x) ? one(x) : sign(x)
 """
