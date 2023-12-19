@@ -5,6 +5,25 @@ using LinearAlgebra: I, norm, tr
 using TimerOutputs
 using OMEinsum: get_size_dict, optimize_greedy,  MinSpaceDiff
 using Zygote
+using Parameters
+
+@with_kw mutable struct Params
+    atype = Array
+    D::Int = 2
+    χ1::Int = 5
+    χ2::Int = 2
+    tol::Real = 1e-10
+    f_tol::Real = 1e-6
+    opiter::Int = 100
+    optimmethod = LBFGS(m = 20)
+    verbose= true
+    mapsteps = 10
+    updown = true
+    downfromup = false
+    savefile = true
+    infolder = "./data/"
+    outfolder = "./data/"
+end
 
 """
     logoverlap(Au, Ad, M)
@@ -16,28 +35,18 @@ using Zygote
     └── Ad──┘                                 f ────┴──── h 
 ````
 """
-function logoverlap(Au, Ad, M)
-    # χ, D,  = size(Au)
-    # Ad /= norm(Ad)
-    # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
-    # 工dd_m = reshape(工dd, χ^2,   χ^2  )
-    # nd   = tr(工dd_m*工dd_m)
-    # Ad /= sqrnd
+function logoverlap(mps_u, mps_d, M, Params)
+    @unpack D, χ1, χ2 = Params
+    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
 
-    # 工dd = ein"acb,dce->adbe"(Ad,conj(Ad))
-    # 工dd_m = reshape(工dd, χ^2,   χ^2  )
-    # nd   = tr(工dd_m*工dd_m)
-    # @show nd
-    # 王ud = ein"(acb,dfec),gfh->adgbeh"(Au,M,conj(Ad))
-    # 工ud = ein"acb,dce->adbe"(Au,conj(Ad))
-    # 王ud_m = reshape(王ud, χ^2*D, χ^2*D)
-    # 工ud_m = reshape(工ud, χ^2,   χ^2  )
+    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
+    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
 
-    # -log(abs2(tr(王ud_m*王ud_m)/tr(工ud_m*工ud_m)))
-    _, FLud = leftenv(Au, conj(Ad), M)
-    _, FRud = rightenv(Au, conj(Ad), M)
-    _, FLd_n = norm_FL(Ad, conj(Ad))
-    _, FRd_n = norm_FR(Ad, conj(Ad))
+    _, FLud = Zygote.@ignore leftenv(Au, conj(Ad), M)
+    _, FRud = Zygote.@ignore rightenv(Au, conj(Ad), M)
+    _, FLd_n = Zygote.@ignore norm_FL(Ad, conj(Ad))
+    _, FRd_n = Zygote.@ignore norm_FR(Ad, conj(Ad))
 
     nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
     Ad /= sqrt(nd)
@@ -56,7 +65,14 @@ end
     j ────┴──── k
 ````
 """
-function compress_fidelity(Au, Ad, M)
+function compress_fidelity(mps_u, mps_d, M, Params)
+    @unpack D, χ1, χ2 = Params
+    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
+
+    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
+    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
+
     _, FLd_n = norm_FL(Ad, conj(Ad))
     _, FRd_n = norm_FR(Ad, conj(Ad))
 
@@ -76,7 +92,14 @@ function compress_fidelity(Au, Ad, M)
 end
 
 
-function overlap(Au, Ad)
+function overlap(mps_u, mps_d, Params)
+    @unpack D, χ1, χ2 = Params
+    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
+
+    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
+    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
+
     _, FLu_n = norm_FL(Au, conj(Au))
     _, FRu_n = norm_FR(Au, conj(Au))
     _, FLd_n = norm_FL(Ad, conj(Ad))
@@ -92,51 +115,49 @@ function overlap(Au, Ad)
     abs2(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
 end
 
-function init_mps(;infolder = "./data/", atype = Array, D::Int = 2, χ::Int = 5, tol::Real = 1e-10, verbose::Bool = true)
-    in_chkp_file = infolder*"/D$(D)_chi$(χ)_tol$(tol).jld2"
+function init_mps(Params)
+    @unpack D, χ1, χ2, infolder, atype, tol, verbose = Params
+    in_chkp_file = infolder*"/D$(D)_χ₁$(χ1)_χ₂$(χ2)_tol$(tol).jld2"
     if isfile(in_chkp_file)
         mps =  atype(load(in_chkp_file)["mps"])
         verbose && println("load mps from $in_chkp_file")
     else
-        mps = atype(rand(ComplexF64,χ,D,χ))
+        mps = atype(rand(ComplexF64,χ1*D*χ1+χ2*D*χ2*D))
         verbose && println("random initial mps $in_chkp_file")
     end
-    _, FL_n = norm_FL(mps, conj(mps))
-    _, FR_n = norm_FR(mps, conj(mps))
-    n = ein"(ad,acb),(dce,be) ->"(FL_n,mps,conj(mps),FR_n)[]/ein"ab,ab ->"(FL_n,FR_n)[]
-    mps /= sqrt(n)
+    normalize!(mps)
     return mps
 end
 
-function onestep(M::AbstractArray; infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true, savefile = true)
-    D = size(M, 1)
-    atype = _arraytype(M)
-    mps = init_mps(infolder = infolder, atype = atype, D = D, χ = χ, tol = tol, verbose = verbose)
+toMPSMPO(mps; D::Int, χ1::Int, χ2::Int) = reshape(mps[1:χ1*D*χ1], χ1,D,χ1), reshape(mps[χ1*D*χ1+1:end], χ2,D,χ2,D)
+
+function onestep(M::AbstractArray, Params)
+    mps = init_mps(Params)
     
-    Au, Ad = mps, mps
+    mps_u, mps_d = mps, mps
     to = TimerOutput()
-    f(Ad) = @timeit to "forward" logoverlap(Au, Ad, M)
-    ff(Ad) = logoverlap(Au, Ad, M)
-    g(Ad) = @timeit to "backward" Zygote.gradient(ff,Ad)[1]
-    if verbose 
+    f(mps_d) = @timeit to "forward" logoverlap(mps_u, mps_d, M, Params)
+    ff(mps_d) = logoverlap(mps_u, mps_d, M, Params)
+    g(mps_d) = @timeit to "backward" Zygote.gradient(ff,mps_d)[1]
+    if Params.verbose 
         message = "time  iter   loss           grad_norm\n"
         printstyled(message; bold=true, color=:blue)
         flush(stdout)
     end
     res = optimize(f, g, 
-        Ad, optimmethod,inplace = false,
-        Optim.Options(f_tol=f_tol, iterations=opiter,
+        mps_d, Params.optimmethod,inplace = false,
+        Optim.Options(f_tol=Params.f_tol, iterations=Params.opiter,
         extended_trace=true,
-        callback=os->writelog(os, outfolder, D, χ, tol, savefile, verbose)),
+        callback=os->writelog(os, Params)),
         )
-    Ad = Optim.minimizer(res)
+    mps_d = Optim.minimizer(res)
 
-    if verbose 
-        message = "compress error   = $(-log(compress_fidelity(Au, Ad, M)))\npower error = $(-log(overlap(Au, Ad))) \n"
+    if Params.verbose 
+        message = "compress error   = $(-log(compress_fidelity(mps_u, mps_d, M, Params)))\npower error = $(-log(overlap(mps_u, mps_d, Params))) \n"
         printstyled(message; bold=true, color=:green)
         flush(stdout)
     end
-    return Ad
+    return mps_d
 end
 
 """
@@ -144,7 +165,8 @@ end
 
 return the optimise infomation of each step, including `time` `iteration` `energy` and `g_norm`, saved in `/data/model_D_chi_tol_maxiter.log`. Save the final `ipeps` in file `/data/model_D_chi_tol_maxiter.jid2`
 """
-function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile, verbose)
+function writelog(os::OptimizationState, Params)
+    @unpack outfolder, D, χ1, χ2, tol, savefile, verbose = Params
     message = "$(round(os.metadata["time"],digits=1))    $(os.iteration)    $(round(os.value,digits=8))    $(round(os.g_norm,digits=8))\n"
 
     if verbose
@@ -154,37 +176,43 @@ function writelog(os::OptimizationState, outfolder, D, χ, tol, savefile, verbos
 
     if savefile 
         !(isdir(outfolder)) && mkpath(outfolder)
-        logfile = open(outfolder*"/D$(D)_chi$(χ)_tol$(tol).log", "a")
+        logfile = open(outfolder*"/D$(D)_χ₁$(χ1)_χ₂$(χ2)_tol$(tol).log", "a")
         write(logfile, message)
         close(logfile)
-        save(outfolder*"/D$(D)_chi$(χ)_tol$(tol).jld2", "mps", Array(os.metadata["x"]))
+        save(outfolder*"/D$(D)_χ₁$(χ1)_χ₂$(χ2)_tol$(tol).jld2", "mps", Array(os.metadata["x"]))
     end
     return false
 end
 
-function optimisemps(M::AbstractArray; infolder = "./data/", outfolder = "./data/", χ::Int = 5, tol::Real = 1e-10, f_tol::Real = 1e-6, opiter::Int = 100, optimmethod = LBFGS(m = 20), verbose= true,  mapsteps = 10, updown = true, downfromup = false)
-    Au = nothing
-    Ad = nothing
+function optimisemps(M::AbstractArray, Params)
+    mps_u = nothing
+    mps_d = nothing
     Md = permutedims(M,(1,4,3,2))
-    for i in 1:mapsteps
-        if verbose 
+    infolder = Params.infolder
+    outfolder = Params.outfolder
+    for i in 1:Params.mapsteps
+        if Params.verbose 
             message = "iter: $i   \n"
             printstyled(message; bold=true, color=:red)
             flush(stdout)
         end
         direction = "↑"
-        Au = onestep(M; infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
-        if updown
-            !downfromup && (direction = "↓")
-            Ad = onestep(Md; infolder = infolder*"$(direction)/", outfolder = outfolder*"$(direction)/", χ = χ, tol = tol, f_tol = f_tol, opiter = opiter, optimmethod = optimmethod, verbose = verbose, savefile = true)
-            if verbose
-                message = "AuAd overlap = $(overlap(Au, Ad)) \n"
+        Params.infolder = infolder*"$(direction)/"
+        Params.outfolder = outfolder*"$(direction)/"
+        mps_u = onestep(M, Params)
+        if Params.updown
+            !Params.downfromup && (direction = "↓")
+            Params.infolder = infolder*"$(direction)/"
+            Params.outfolder = outfolder*"$(direction)/"
+            mps_d = onestep(Md, Params)
+            if Params.verbose
+                message = "AuAd overlap = $(overlap(mps_u, mps_d, Params)) \n"
                 printstyled(message; bold=true, color=:red)
                 flush(stdout)
             end
         else
-            Ad = Au
+            mps_d = mps_u
         end
     end
-    return Au, Ad
+    return mps_u, mps_d
 end
