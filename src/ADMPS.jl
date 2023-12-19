@@ -1,5 +1,7 @@
 module ADMPS
 
+using Parameters
+
 export Ising, TFIsing, Heisenberg
 export Z,magnetisation, energy
 export hamiltonian, model_tensor, mag_tensor, energy_tensor

@@ -8,7 +8,6 @@ using OMEinsum
 using Random
 using Test
 using Zygote
-using Parameters
 
 @testset "gradient with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
     Random.seed!(100)
