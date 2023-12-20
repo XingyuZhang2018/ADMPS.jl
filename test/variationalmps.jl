@@ -18,7 +18,7 @@ using Zygote
     mps = init_mps(params)
     mps_u = mps
     mps_d = mps
-    ff(mps_d) = logoverlap(para_u, mps_d, M)
+    ff(mps_d) = logoverlap(mps_u, mps_d, M)
     # @show logoverlap(Au, mps, M),Zygote.gradient(ff,Ad)
     gradzygote = first(Zygote.gradient(mps) do x
         logoverlap(mps_u, x, M, params)
@@ -49,9 +49,9 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    params = ADMPS.Params(D=2, χ1=5, χ2=3, 
+    params = ADMPS.Params(D=2, χ1=5, χ2=0, 
                           opiter=20, 
-                          f_tol = 1e-10,
+                          f_tol = 1e-15,
                           mapsteps = 20,
                           infolder=infolder*"$(model)/", 
                           outfolder=outfolder*"$(model)/", 
@@ -74,7 +74,7 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    params = ADMPS.Params(D=2, χ1=5, χ2=3, 
+    params = ADMPS.Params(D=2, χ1=5, χ2=0, 
                           opiter=20, 
                           f_tol = 1e-10,
                           mapsteps = 20,

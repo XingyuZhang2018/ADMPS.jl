@@ -37,11 +37,8 @@ end
 """
 function logoverlap(mps_u, mps_d, M, Params)
     @unpack D, χ1, χ2 = Params
-    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
-
-    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
-    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
+    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
 
     _, FLud = Zygote.@ignore leftenv(Au, conj(Ad), M)
     _, FRud = Zygote.@ignore rightenv(Au, conj(Ad), M)
@@ -67,11 +64,8 @@ end
 """
 function compress_fidelity(mps_u, mps_d, M, Params)
     @unpack D, χ1, χ2 = Params
-    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
-
-    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
-    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
+    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
 
     _, FLd_n = norm_FL(Ad, conj(Ad))
     _, FRd_n = norm_FR(Ad, conj(Ad))
@@ -94,11 +88,8 @@ end
 
 function overlap(mps_u, mps_d, Params)
     @unpack D, χ1, χ2 = Params
-    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
-
-    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
-    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
+    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
 
     _, FLu_n = norm_FL(Au, conj(Au))
     _, FRu_n = norm_FR(Au, conj(Au))
@@ -129,7 +120,15 @@ function init_mps(Params)
     return mps
 end
 
-toMPSMPO(mps; D::Int, χ1::Int, χ2::Int) = reshape(mps[1:χ1*D*χ1], χ1,D,χ1), reshape(mps[χ1*D*χ1+1:end], χ2,D,χ2,D)
+function toMPS(mps; D::Int, χ1::Int, χ2::Int)
+    mps /= norm(mps)
+    if χ2 != 0
+        A, M = reshape(mps[1:χ1*D*χ1], χ1,D,χ1), reshape(mps[χ1*D*χ1+1:end], χ2,D,χ2,D)
+        return reshape(ein"abc,defb->adecf"(A, M), χ1*χ2,D,χ1*χ2)
+    else
+        return reshape(mps, χ1,D,χ1)
+    end
+end
 
 function onestep(M::AbstractArray, Params)
     mps = init_mps(Params)

@@ -1,10 +1,8 @@
 function obs_env(M, mps_u, mps_d, Params)
     @unpack D, χ1, χ2 = Params
 
-    Au, Mu = toMPSMPO(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad, Md = toMPSMPO(mps_d; D=D, χ1=χ1, χ2=χ2)
-    Au = reshape(ein"abc,defb->adecf"(Au, Mu), χ1*χ2,D,χ1*χ2)
-    Ad = reshape(ein"abc,defb->adecf"(Ad, Md), χ1*χ2,D,χ1*χ2)
+    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
+    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
     
     _, FL = leftenv(Au, Ad, M)
     _, FR = rightenv(Au, Ad, M)
