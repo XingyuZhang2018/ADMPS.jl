@@ -33,6 +33,18 @@ function model_tensor(model::Ising)
     ein"abcd,ai,bj,ck,dl -> ijkl"(a,q,q,q,q)
 end
 
+function model_tensor(model::IsingP)
+    β = model.β
+    a = reshape(Float64[1 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 1], 2,2,2,2)
+    cβ, sβ = sqrt(cosh(β)), sqrt(sinh(β))
+    q = 1/sqrt(2) * [cβ+sβ cβ-sβ; cβ-sβ cβ+sβ]
+    m = ein"abcd,ai,bj,ck,dl -> ijkl"(a,q,q,q,q)
+
+    P = exp(-model.τ * [1 0; 0 -1])
+    m = ein"abcd,bi,dj -> aicj"(m,P,P^-1)
+    return m
+end
+
 """
     mag_tensor(::Ising,β)
 

@@ -35,7 +35,8 @@ FL ─ M ─  = λL FL─       ├─ d ─┼─ e ─┤
 ```
 """
 function leftenv(Au, Ad, M, FL = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,1), size(Ad,1))); kwargs...)
-    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad), FL, 1, :LM; ishermitian = false, kwargs...)
+    λs, FLs, info = eigsolve(FL -> ein"((adf,abc),dgeb),fgh -> ceh"(FL,Au,M,Ad), FL, 1, :LM; ishermitian = false, maxiter = 100)
+    info == 0 && @warn "eigsolve not converged"
     if length(λs) > 1 && norm(abs(λs[1]) - abs(λs[2])) < 1e-12
         @show λs
         if real(λs[1]) > 0
@@ -60,7 +61,7 @@ of `Au - M - Ad` contracted Aung the physical dimension.
  ─ Ad ──┘         ──┘      f ────┴──── h 
 ```
 """
-function rightenv(Au, Ad, M, FR = _arraytype(Au)(randn(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
+function rightenv(Au, Ad, M, FR = _arraytype(Au)(rand(eltype(Au), size(Au,1), size(M,3), size(Ad,1))); kwargs...)
     Au = permutedims(Au,(3,2,1))
     Ad = permutedims(Ad,(3,2,1))
     ML = permutedims(M,(3,2,1,4))

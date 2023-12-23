@@ -11,3 +11,8 @@ struct Ising{T<:Real} <: HamiltonianModel
 end
 
 const isingβc = log(1+sqrt(2))/2
+
+struct IsingP <: HamiltonianModel 
+    β::Float64
+    τ::Float64
+end

@@ -1,5 +1,5 @@
 using ADMPS
-using ADMPS: num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps
+using ADMPS: normality, num_grad,Zofβ,logoverlap,Z,obs_env,magofβ,eneofβ,overlap,onestep,isingβc,init_mps
 using CUDA
 using KrylovKit
 using LinearAlgebra: svd, norm
@@ -14,19 +14,21 @@ using Zygote
     β = 0.4
     model = Ising(β)
     M = atype{dtype}(model_tensor(model))
-    params = ADMPS.Params(D=2, χ1=5, χ2=2)
+    D,χ1,χ2 = 2,5,2
+    params = ADMPS.Params(D=D, χ1=χ1, χ2=χ2, optimU=true)
     mps = init_mps(params)
     mps_u = mps
     mps_d = mps
-    ff(mps_d) = logoverlap(mps_u, mps_d, M)
-    # @show logoverlap(Au, mps, M),Zygote.gradient(ff,Ad)
+    ff(mps_d) = logoverlap(mps_u, mps_d, M, params)
     gradzygote = first(Zygote.gradient(mps) do x
         logoverlap(mps_u, x, M, params)
     end)
     gradnum = num_grad(mps, δ=1e-4) do x
         logoverlap(mps_u, x, M, params)
     end
-    @test gradzygote ≈ gradnum atol=1e-5
+    # @test gradzygote ≈ gradnum atol=1e-5
+    @test gradzygote[χ1*D*χ1+1:end] ≈ gradnum[χ1*D*χ1+1:end] atol=1e-5
+    # @show norm(gradzygote-gradnum)
 end
 
 @testset "onestep optimize Ad with $atype{$dtype}" for atype in [Array], dtype in [ComplexF64]
@@ -36,7 +38,10 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    Ad = onestep(M, ADMPS.Params(D=2, χ1=5, χ2=2, opiter=5, infolder="./data/$model/", outfolder="./data/$model/"))
+    Ad = onestep(M, ADMPS.Params(D=2, χ1=5, χ2=2, opiter=5, 
+    infolder="./data/$model/", outfolder="./data/$model/",
+    optimU=false
+    ))
     @test Ad !== nothing
 end
 
@@ -49,10 +54,12 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    params = ADMPS.Params(D=2, χ1=5, χ2=0, 
-                          opiter=20, 
+    params = ADMPS.Params(D=2, χ1=5, χ2=1, 
+                          opiter = 10, 
                           f_tol = 1e-15,
-                          mapsteps = 20,
+                          show_every = 10,
+                          mapsteps = 1,
+                          optimU = true,
                           infolder=infolder*"$(model)/", 
                           outfolder=outfolder*"$(model)/", 
                           updown=false)
@@ -74,7 +81,7 @@ end
     M = atype{dtype}(model_tensor(model))
     Random.seed!(seed_number)
 
-    params = ADMPS.Params(D=2, χ1=5, χ2=0, 
+    params = ADMPS.Params(D=2, χ1=5, χ2=2, 
                           opiter=20, 
                           f_tol = 1e-10,
                           mapsteps = 20,

@@ -15,6 +15,7 @@ using Parameters
     tol::Real = 1e-10
     f_tol::Real = 1e-6
     opiter::Int = 100
+    show_every::Int = 1
     optimmethod = LBFGS(m = 20)
     verbose= true
     mapsteps = 10
@@ -37,18 +38,18 @@ end
 """
 function logoverlap(mps_u, mps_d, M, Params)
     @unpack D, χ1, χ2 = Params
-    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
+    Au, Ad = toMPS(mps_u, mps_d; D=D, χ1=χ1, χ2=χ2, optimU=Params.optimU)
+
+    _, FLd_n = Zygote.@ignore norm_FL(Ad, conj(Ad))
+    _, FRd_n = Zygote.@ignore norm_FR(Ad, conj(Ad))
+    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
+    Ad /= sqrt(nd)
 
     _, FLud = Zygote.@ignore leftenv(Au, conj(Ad), M)
     _, FRud = Zygote.@ignore rightenv(Au, conj(Ad), M)
-    _, FLd_n = Zygote.@ignore norm_FL(Ad, conj(Ad))
-    _, FRd_n = Zygote.@ignore norm_FR(Ad, conj(Ad))
 
-    nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
-    Ad /= sqrt(nd)
-    AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
-    -log(abs(AuM))
+    AuMAd = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
+    -log(abs(AuMAd))
 end
 
 """
@@ -62,11 +63,7 @@ end
     j ────┴──── k
 ````
 """
-function compress_fidelity(mps_u, mps_d, M, Params)
-    @unpack D, χ1, χ2 = Params
-    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
-
+function compress_fidelity(Au, Ad, M)
     _, FLd_n = norm_FL(Ad, conj(Ad))
     _, FRd_n = norm_FR(Ad, conj(Ad))
 
@@ -82,28 +79,26 @@ function compress_fidelity(mps_u, mps_d, M, Params)
     _, FLud = leftenv(Au, conj(Ad), M)
     _, FRud = rightenv(Au, conj(Ad), M)
     AuM = ein"(((adf,abc),dgeb),fgh),ceh -> "(FLud,Au,M,conj(Ad),FRud)[]/ein"abc,abc -> "(FLud,FRud)[]
+
     abs2(AuM)
 end
 
 
-function overlap(mps_u, mps_d, Params)
-    @unpack D, χ1, χ2 = Params
-    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
-
-    _, FLu_n = norm_FL(Au, conj(Au))
-    _, FRu_n = norm_FR(Au, conj(Au))
-    _, FLd_n = norm_FL(Ad, conj(Ad))
-    _, FRd_n = norm_FR(Ad, conj(Ad))
-
+function overlap(Au, Ad)
+    _, FLu_n = Zygote.@ignore norm_FL(Au, conj(Au))
+    _, FRu_n = Zygote.@ignore norm_FR(Au, conj(Au))
     nu = ein"(ad,acb),(dce,be) ->"(FLu_n,Au,conj(Au),FRu_n)[]/ein"ab,ab ->"(FLu_n,FRu_n)[]
     Au /= sqrt(nu)
+
+    _, FLd_n = Zygote.@ignore norm_FL(Ad, conj(Ad))
+    _, FRd_n = Zygote.@ignore norm_FR(Ad, conj(Ad))
     nd = ein"(ad,acb),(dce,be) ->"(FLd_n,Ad,conj(Ad),FRd_n)[]/ein"ab,ab ->"(FLd_n,FRd_n)[]
     Ad /= sqrt(nd)
 
-    _, FLud_n = norm_FL(Au, conj(Ad))
-    _, FRud_n = norm_FR(Au, conj(Ad))
-    abs2(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
+    _, FLud_n = Zygote.@ignore norm_FL(Au, conj(Ad))
+    _, FRud_n = Zygote.@ignore norm_FR(Au, conj(Ad))
+
+    abs(ein"(ad,acb),(dce,be) ->"(FLud_n,Au,conj(Ad),FRud_n)[]/ein"ab,ab ->"(FLud_n,FRud_n)[])
 end
 
 function init_mps(Params)
@@ -116,18 +111,14 @@ function init_mps(Params)
         mps = atype(rand(ComplexF64,χ1*D*χ1+χ2*D*χ2*D))
         verbose && println("random initial mps $in_chkp_file")
     end
-    normalize!(mps)
-    return mps
-end
+    Au, Ad = toMPS(mps, mps; D=D, χ1=χ1, χ2=χ2, optimU=Params.optimU)
 
-function toMPS(mps; D::Int, χ1::Int, χ2::Int)
-    mps /= norm(mps)
-    if χ2 != 0
-        A, M = reshape(mps[1:χ1*D*χ1], χ1,D,χ1), reshape(mps[χ1*D*χ1+1:end], χ2,D,χ2,D)
-        return reshape(ein"abc,defb->adecf"(A, M), χ1*χ2,D,χ1*χ2)
-    else
-        return reshape(mps, χ1,D,χ1)
-    end
+    _, FLu_n = Zygote.@ignore norm_FL(Au, conj(Au))
+    _, FRu_n = Zygote.@ignore norm_FR(Au, conj(Au))
+    nu = ein"(ad,acb),(dce,be) ->"(FLu_n,Au,conj(Au),FRu_n)[]/ein"ab,ab ->"(FLu_n,FRu_n)[]
+    mps /= sqrt(nu)
+
+    return mps
 end
 
 function onestep(M::AbstractArray, Params)
@@ -168,7 +159,7 @@ function writelog(os::OptimizationState, Params)
     @unpack outfolder, D, χ1, χ2, tol, savefile, verbose = Params
     message = "$(round(os.metadata["time"],digits=1))    $(os.iteration)    $(round(os.value,digits=8))    $(round(os.g_norm,digits=8))\n"
 
-    if verbose
+    if verbose && (os.iteration % Params.show_every == 0)
         printstyled(message; bold=true, color=:blue)
         flush(stdout)
     end

@@ -1,13 +1,12 @@
 function obs_env(M, mps_u, mps_d, Params)
     @unpack D, χ1, χ2 = Params
 
-    Au = toMPS(mps_u; D=D, χ1=χ1, χ2=χ2) 
-    Ad = toMPS(mps_d; D=D, χ1=χ1, χ2=χ2) 
+    Au, Ad = toMPS(mps_u, mps_d; D=D, χ1=χ1, χ2=χ2, optimU = Params.optimU)
     
-    _, FL = leftenv(Au, Ad, M)
-    _, FR = rightenv(Au, Ad, M)
-    _, FL_n = norm_FL(Au, Ad)
-    _, FR_n = norm_FR(Au, Ad)
+    _, FL = leftenv(Au, conj(Ad), M)
+    _, FR = rightenv(Au, conj(Ad), M)
+    _, FL_n = norm_FL(Au, conj(Ad))
+    _, FR_n = norm_FR(Au, conj(Ad))
     M, Au, Ad, FL, FR, FL_n, FR_n
 end
 
@@ -18,9 +17,9 @@ return the up and down partition function of the `env`.
 """
 function Z(env)
     M, Au, Ad, FL, FR, FL_n, FR_n = env
-    z = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,Ad)[]
+    z = ein"(((adf,abc),dgeb),ceh),fgh -> "(FL,Au,M,FR,conj(Ad))[]
     λ = ein"abc,abc -> "(FL,FR)[]
-    overlap = ein"(ad,acb),(dce,be) ->"(FL_n,Au,Ad,FR_n)[]/ein"ab,ab ->"(FL_n,FR_n)[]
+    overlap = ein"(ad,acb),(dce,be) ->"(FL_n,Au,conj(Ad),FR_n)[]/ein"ab,ab ->"(FL_n,FR_n)[]
     return z/λ/overlap
 end
 
